@@ -4,31 +4,31 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay", "src\Relay.csproj",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Basic", "Relay.Examples.Basic\Relay.Examples.Basic.csproj", "{7C77897A-8967-431D-9E06-200F5C11628C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Basic", "examples\Relay.Examples.Basic\Relay.Examples.Basic.csproj", "{7C77897A-8967-431D-9E06-200F5C11628C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Tests", "Relay.Tests\Relay.Tests.csproj", "{537B681F-5B1A-4E36-9EED-8CC30E5D2E81}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Tests", "tests\Relay.Tests\Relay.Tests.csproj", "{537B681F-5B1A-4E36-9EED-8CC30E5D2E81}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Conditional", "Relay.Examples.Conditional\Relay.Examples.Conditional.csproj", "{76989990-FEE3-4C8F-82B5-2FC52617C676}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Conditional", "examples\Relay.Examples.Conditional\Relay.Examples.Conditional.csproj", "{76989990-FEE3-4C8F-82B5-2FC52617C676}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.MultiBroadcasting", "Relay.Examples.MultiBroadcasting\Relay.Examples.MultiBroadcasting.csproj", "{35C9EA01-DA81-42D7-855D-6C80E9AFDEA4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.MultiBroadcasting", "examples\Relay.Examples.MultiBroadcasting\Relay.Examples.MultiBroadcasting.csproj", "{35C9EA01-DA81-42D7-855D-6C80E9AFDEA4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.MultiFailover", "Relay.Examples.MultiFailover\Relay.Examples.MultiFailover.csproj", "{312AF4B0-A25B-4B70-AD8D-15325BBC9459}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.MultiFailover", "examples\Relay.Examples.MultiFailover\Relay.Examples.MultiFailover.csproj", "{312AF4B0-A25B-4B70-AD8D-15325BBC9459}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Adapter", "Relay.Examples.Adapter\Relay.Examples.Adapter.csproj", "{4C6B9918-D8F0-4329-92D7-FC7EB0197681}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Adapter", "examples\Relay.Examples.Adapter\Relay.Examples.Adapter.csproj", "{4C6B9918-D8F0-4329-92D7-FC7EB0197681}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdapterFactory", "Relay.Examples.AdapterFactory\Relay.Examples.AdapterFactory.csproj", "{DB77AE40-5BCF-4ECC-ADF7-9080A69E7368}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdapterFactory", "examples\Relay.Examples.AdapterFactory\Relay.Examples.AdapterFactory.csproj", "{DB77AE40-5BCF-4ECC-ADF7-9080A69E7368}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Factory", "Relay.Examples.Factory\Relay.Examples.Factory.csproj", "{4EBFF6A8-770F-4723-87EE-70175DE20891}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Factory", "examples\Relay.Examples.Factory\Relay.Examples.Factory.csproj", "{4EBFF6A8-770F-4723-87EE-70175DE20891}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.ParallelWithResults", "Relay.Examples.ParallelWithResults\Relay.Examples.ParallelWithResults.csproj", "{797A2714-3414-4249-A1B6-D0132422E075}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.ParallelWithResults", "examples\Relay.Examples.ParallelWithResults\Relay.Examples.ParallelWithResults.csproj", "{797A2714-3414-4249-A1B6-D0132422E075}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.ConditionalRouting", "Relay.Examples.ConditionalRouting\Relay.Examples.ConditionalRouting.csproj", "{44A73063-EC5C-41DA-A6E7-B042C4FC73B4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.ConditionalRouting", "examples\Relay.Examples.ConditionalRouting\Relay.Examples.ConditionalRouting.csproj", "{44A73063-EC5C-41DA-A6E7-B042C4FC73B4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Integration", "Relay.Examples.Integration\Relay.Examples.Integration.csproj", "{32A8A4D5-52C0-4383-9933-A21C9F2D878F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.Integration", "examples\Relay.Examples.Integration\Relay.Examples.Integration.csproj", "{32A8A4D5-52C0-4383-9933-A21C9F2D878F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.DecorateWith", "Relay.Examples.DecorateWith\Relay.Examples.DecorateWith.csproj", "{B7D20116-EB4A-4207-8C02-2C9F4728FA5F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.DecorateWith", "examples\Relay.Examples.DecorateWith\Relay.Examples.DecorateWith.csproj", "{B7D20116-EB4A-4207-8C02-2C9F4728FA5F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdvancedDecorator", "Relay.Examples.AdvancedDecorator\Relay.Examples.AdvancedDecorator.csproj", "{242EB29B-65C0-4B1F-A496-5BF256201D6B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdvancedDecorator", "examples\Relay.Examples.AdvancedDecorator\Relay.Examples.AdvancedDecorator.csproj", "{242EB29B-65C0-4B1F-A496-5BF256201D6B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
