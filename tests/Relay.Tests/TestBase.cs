@@ -119,41 +119,27 @@ public class LegacyDataService
 }
 
 // Adapter for legacy system
-public class LegacyDataAdapter : ITestRepository
+public class LegacyDataAdapter(LegacyDataService legacyService) : ITestRepository
 {
-    private readonly LegacyDataService _legacyService;
-
-    public LegacyDataAdapter(LegacyDataService legacyService)
-    {
-        _legacyService = legacyService;
-    }
-
     public async Task<string> GetDataAsync(int id)
     {
         await Task.Delay(1);
-        return _legacyService.GetLegacyData(id);
+        return legacyService.GetLegacyData(id);
     }
 }
 
 // Decorator for testing
-public class LoggingDecorator : ITestService
+public class LoggingDecorator(ITestService inner) : ITestService
 {
-    private readonly ITestService _inner;
-
-    public LoggingDecorator(ITestService inner)
-    {
-        _inner = inner;
-    }
-
     public string Process(string input)
     {
-        var result = _inner.Process(input);
+        var result = inner.Process(input);
         return $"[Logged] {result}";
     }
 
     public async Task<string> ProcessAsync(string input)
     {
-        var result = await _inner.ProcessAsync(input);
+        var result = await inner.ProcessAsync(input);
         return $"[Logged] {result}";
     }
 }

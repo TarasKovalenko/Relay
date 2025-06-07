@@ -62,21 +62,14 @@ namespace Relay.Examples.Adapter
     }
 
     // Adapter to bridge the gap
-    public class LegacyPaymentAdapter : IModernPaymentService
+    public class LegacyPaymentAdapter(LegacyPaymentGateway legacyGateway) : IModernPaymentService
     {
-        private readonly LegacyPaymentGateway _legacyGateway;
-
-        public LegacyPaymentAdapter(LegacyPaymentGateway legacyGateway)
-        {
-            _legacyGateway = legacyGateway;
-        }
-
         public async Task<PaymentResponse> ProcessAsync(PaymentRequest request)
         {
             try
             {
                 var transactionId = await Task.Run(
-                    () => _legacyGateway.ProcessPayment((double)request.Amount, request.CardNumber)
+                    () => legacyGateway.ProcessPayment((double)request.Amount, request.CardNumber)
                 );
 
                 return new PaymentResponse { IsSuccessful = true, TransactionId = transactionId };

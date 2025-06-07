@@ -215,18 +215,11 @@ public class DecoratorExtensionsTests : TestBase
         repository.ShouldBeOfType<CachingRepositoryDecorator>();
     }
 
-    private class CachingRepositoryDecorator : ITestRepository
+    private class CachingRepositoryDecorator(ITestRepository inner) : ITestRepository
     {
-        private readonly ITestRepository _inner;
-
-        public CachingRepositoryDecorator(ITestRepository inner)
-        {
-            _inner = inner;
-        }
-
         public async Task<string> GetDataAsync(int id)
         {
-            var result = await _inner.GetDataAsync(id);
+            var result = await inner.GetDataAsync(id);
             return $"[Cached] {result}";
         }
     }

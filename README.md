@@ -109,7 +109,7 @@ services.AddAdapter<INotificationService, ThirdPartyEmailService>()
     .Using(emailService => new EmailNotificationAdapter(emailService));
 ```
 
-### **5. TODO - Adapter Chains (A→B→C→X)**
+### **5. Adapter Chains (A→B→C→X)**
 ```csharp
 // Complex transformation pipeline
 services.AddAdapterChain<IResult>()

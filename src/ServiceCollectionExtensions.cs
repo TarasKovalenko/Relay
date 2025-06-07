@@ -98,4 +98,28 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRelayResolver, RelayResolver>();
         return services;
     }
+
+    /// <summary>
+    /// Register an adapter chain for complex transformation pipelines
+    /// </summary>
+    public static AdapterChainBuilder<TResult> AddAdapterChain<TResult>(
+        this IServiceCollection services
+    )
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return new AdapterChainBuilder<TResult>(services);
+    }
+
+    /// <summary>
+    /// Register a strongly-typed adapter chain with known source and target types
+    /// </summary>
+    public static TypedAdapterChainBuilder<TSource, TTarget> AddTypedAdapterChain<TSource, TTarget>(
+        this IServiceCollection services
+    )
+        where TSource : class
+        where TTarget : class
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return new TypedAdapterChainBuilder<TSource, TTarget>(services);
+    }
 }

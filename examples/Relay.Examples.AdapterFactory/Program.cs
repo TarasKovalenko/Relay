@@ -29,18 +29,12 @@ namespace Relay.Examples.AdapterFactory
         }
     }
 
-    public class EmailNotificationAdapter : INotificationService
+    public class EmailNotificationAdapter(ThirdPartyEmailService emailService)
+        : INotificationService
     {
-        private readonly ThirdPartyEmailService _emailService;
-
-        public EmailNotificationAdapter(ThirdPartyEmailService emailService)
-        {
-            _emailService = emailService;
-        }
-
         public async Task SendAsync(string message, string recipient)
         {
-            await Task.Run(() => _emailService.SendEmail(recipient, "Notification", message));
+            await Task.Run(() => emailService.SendEmail(recipient, "Notification", message));
         }
     }
 }

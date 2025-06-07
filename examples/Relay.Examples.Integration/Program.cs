@@ -192,18 +192,11 @@ namespace Relay.Examples.Integration
         }
     }
 
-    public class UserRepositoryAdapter : IUserRepository
+    public class UserRepositoryAdapter(LegacyUserDatabase legacyDb) : IUserRepository
     {
-        private readonly LegacyUserDatabase _legacyDb;
-
-        public UserRepositoryAdapter(LegacyUserDatabase legacyDb)
-        {
-            _legacyDb = legacyDb;
-        }
-
         public async Task<User> GetUserAsync(int id)
         {
-            var userData = await Task.Run(() => _legacyDb.GetUserData(id));
+            var userData = await Task.Run(() => legacyDb.GetUserData(id));
             var parts = userData.Split('|');
 
             return new User

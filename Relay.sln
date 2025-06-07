@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.DecorateWith
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdvancedDecorator", "examples\Relay.Examples.AdvancedDecorator\Relay.Examples.AdvancedDecorator.csproj", "{242EB29B-65C0-4B1F-A496-5BF256201D6B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Relay.Examples.AdapterChain", "examples\Relay.Examples.AdapterChain\Relay.Examples.AdapterChain.csproj", "{A1DCFE8F-9EA6-42A8-9ECD-770592075235}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -92,6 +94,10 @@ Global
 		{242EB29B-65C0-4B1F-A496-5BF256201D6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{242EB29B-65C0-4B1F-A496-5BF256201D6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{242EB29B-65C0-4B1F-A496-5BF256201D6B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1DCFE8F-9EA6-42A8-9ECD-770592075235}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1DCFE8F-9EA6-42A8-9ECD-770592075235}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1DCFE8F-9EA6-42A8-9ECD-770592075235}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1DCFE8F-9EA6-42A8-9ECD-770592075235}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{7C77897A-8967-431D-9E06-200F5C11628C} = {2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}
@@ -106,5 +112,6 @@ Global
 		{32A8A4D5-52C0-4383-9933-A21C9F2D878F} = {2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}
 		{B7D20116-EB4A-4207-8C02-2C9F4728FA5F} = {2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}
 		{242EB29B-65C0-4B1F-A496-5BF256201D6B} = {2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}
+		{A1DCFE8F-9EA6-42A8-9ECD-770592075235} = {2DBE46D5-AB38-4455-8FE2-86A2BFA063E1}
 	EndGlobalSection
 EndGlobal

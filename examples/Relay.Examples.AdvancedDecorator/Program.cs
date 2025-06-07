@@ -56,15 +56,8 @@ namespace Relay.Examples.AdvancedDecorator
     }
 
     // Validation decorator
-    public class ValidationPaymentDecorator : IPaymentService
+    public class ValidationPaymentDecorator(IPaymentService inner) : IPaymentService
     {
-        private readonly IPaymentService _inner;
-
-        public ValidationPaymentDecorator(IPaymentService inner)
-        {
-            _inner = inner;
-        }
-
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
             if (amount <= 0)
@@ -77,21 +70,15 @@ namespace Relay.Examples.AdvancedDecorator
                 throw new ArgumentException("Currency must be 3 characters");
 
             Console.WriteLine($"[VALIDATION] Payment validated: ${amount} {currency}");
-            return await _inner.ProcessPaymentAsync(amount, currency);
+            return await inner.ProcessPaymentAsync(amount, currency);
         }
     }
 
     // Metrics decorator
-    public class MetricsPaymentDecorator : IPaymentService
+    public class MetricsPaymentDecorator(IPaymentService inner) : IPaymentService
     {
-        private readonly IPaymentService _inner;
         private static int _totalPayments = 0;
         private static decimal _totalAmount = 0;
-
-        public MetricsPaymentDecorator(IPaymentService inner)
-        {
-            _inner = inner;
-        }
 
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
@@ -99,7 +86,7 @@ namespace Relay.Examples.AdvancedDecorator
 
             try
             {
-                var result = await _inner.ProcessPaymentAsync(amount, currency);
+                var result = await inner.ProcessPaymentAsync(amount, currency);
 
                 if (result.Success)
                 {
@@ -141,37 +128,24 @@ namespace Relay.Examples.AdvancedDecorator
     }
 
     // Logging decorator
-    public class LoggingPaymentDecorator : IPaymentService
+    public class LoggingPaymentDecorator(IPaymentService inner) : IPaymentService
     {
-        private readonly IPaymentService _inner;
-
-        public LoggingPaymentDecorator(IPaymentService inner)
-        {
-            _inner = inner;
-        }
-
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
             Console.WriteLine($"[LOG] Processing payment: ${amount} {currency}");
-            var result = await _inner.ProcessPaymentAsync(amount, currency);
+            var result = await inner.ProcessPaymentAsync(amount, currency);
             Console.WriteLine($"[LOG] Payment result: {result.Success} - {result.TransactionId}");
             return result;
         }
     }
 
     // Circuit breaker decorator
-    public class CircuitBreakerPaymentDecorator : IPaymentService
+    public class CircuitBreakerPaymentDecorator(IPaymentService inner) : IPaymentService
     {
-        private readonly IPaymentService _inner;
         private int _failureCount = 0;
         private DateTime? _lastFailureTime = null;
         private readonly int _threshold = 3;
         private readonly TimeSpan _timeout = TimeSpan.FromMinutes(1);
-
-        public CircuitBreakerPaymentDecorator(IPaymentService inner)
-        {
-            _inner = inner;
-        }
 
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
@@ -187,7 +161,7 @@ namespace Relay.Examples.AdvancedDecorator
 
             try
             {
-                var result = await _inner.ProcessPaymentAsync(amount, currency);
+                var result = await inner.ProcessPaymentAsync(amount, currency);
 
                 if (result.Success)
                 {
@@ -208,15 +182,9 @@ namespace Relay.Examples.AdvancedDecorator
     }
 
     // Caching decorator
-    public class CachingPaymentDecorator : IPaymentService
+    public class CachingPaymentDecorator(IPaymentService inner) : IPaymentService
     {
-        private readonly IPaymentService _inner;
         private static readonly Dictionary<string, PaymentResult> _cache = new();
-
-        public CachingPaymentDecorator(IPaymentService inner)
-        {
-            _inner = inner;
-        }
 
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
@@ -228,7 +196,7 @@ namespace Relay.Examples.AdvancedDecorator
                 return cached;
             }
 
-            var result = await _inner.ProcessPaymentAsync(amount, currency);
+            var result = await inner.ProcessPaymentAsync(amount, currency);
             _cache[key] = result;
             Console.WriteLine($"[CACHE] Cached result for {key}");
             return result;
@@ -236,27 +204,18 @@ namespace Relay.Examples.AdvancedDecorator
     }
 
     // Retry decorator
-    public class RetryPaymentDecorator : IPaymentService
+    public class RetryPaymentDecorator(IPaymentService inner, int maxRetries = 3) : IPaymentService
     {
-        private readonly IPaymentService _inner;
-        private readonly int _maxRetries;
-
-        public RetryPaymentDecorator(IPaymentService inner, int maxRetries = 3)
-        {
-            _inner = inner;
-            _maxRetries = maxRetries;
-        }
-
         public async Task<PaymentResult> ProcessPaymentAsync(decimal amount, string currency)
         {
-            for (int attempt = 1; attempt <= _maxRetries; attempt++)
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
                 try
                 {
-                    Console.WriteLine($"[RETRY] Attempt {attempt}/{_maxRetries}");
-                    return await _inner.ProcessPaymentAsync(amount, currency);
+                    Console.WriteLine($"[RETRY] Attempt {attempt}/{maxRetries}");
+                    return await inner.ProcessPaymentAsync(amount, currency);
                 }
-                catch (Exception ex) when (attempt < _maxRetries)
+                catch (Exception ex) when (attempt < maxRetries)
                 {
                     Console.WriteLine($"[RETRY] Attempt {attempt} failed: {ex.Message}");
                     await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt))); // Exponential backoff
@@ -264,7 +223,7 @@ namespace Relay.Examples.AdvancedDecorator
             }
 
             // Final attempt without catching
-            return await _inner.ProcessPaymentAsync(amount, currency);
+            return await inner.ProcessPaymentAsync(amount, currency);
         }
     }
 }
