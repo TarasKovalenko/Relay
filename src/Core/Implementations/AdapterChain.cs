@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Interfaces;
 
@@ -66,7 +67,15 @@ public sealed class AdapterChain<TResult>(
                 );
             }
 
-            current = adaptMethod.Invoke(adapter, [current])!;
+            try
+            {
+                current = adaptMethod.Invoke(adapter, [current])!;
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException != null)
+            {
+                // Unwrap and re-throw the inner exception to preserve original stack trace
+                throw ex.InnerException;
+            }
         }
 
         if (current is not TResult result)
