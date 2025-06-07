@@ -1,10 +1,22 @@
 # 🔗 Relay - Adaptive Dependency Injection
 
-[![.NET](https://img.shields.io/badge/.NET-6%2B-blue)](https://dotnet.microsoft.com/)
-[![NuGet](https://img.shields.io/badge/NuGet-Available-brightgreen)](https://www.nuget.org/packages/Relay)
+[![Made in Ukraine](https://img.shields.io/badge/made_in-ukraine-ffd700.svg?labelColor=0057b7)](https://taraskovalenko.github.io/)
+[![Relay](https://img.shields.io/nuget/v/Relay?label=Relay)](https://www.nuget.org/packages/Relay)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Relay your dependency injection to the next level! A powerful, fluent library that extends Microsoft.Extensions.DependencyInjection with adaptive patterns for conditional routing, multi-relays, adapter chains, and dynamic service resolution.
+
+## Terms of use
+
+By using this project or its source code, for any purpose and in any shape or form, you grant your **implicit agreement** to all of the following statements:
+
+- You unequivocally condemn Russia and its military aggression against Ukraine
+- You recognize that Russia is an occupant that unlawfully invaded a sovereign state
+- You agree that [Russia is a terrorist state](https://www.europarl.europa.eu/doceo/document/RC-9-2022-0482_EN.html)
+- You fully support Ukraine's territorial integrity, including its claims over [temporarily occupied territories](https://en.wikipedia.org/wiki/Russian-occupied_territories_of_Ukraine)
+- You reject false narratives perpetuated by Russian state propaganda
+
+To learn more about the war and how you can help, [click here](https://war.ukraine.ua/). Glory to Ukraine! 🇺🇦
 
 ## 🎯 **Why Relay?**
 
@@ -274,7 +286,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="1.0.0" />
+<PackageReference Include="Relay" Version="1.0.3" />
 ```
 
 ### **Basic Setup**
@@ -296,13 +308,7 @@ public void ConfigureServices(IServiceCollection services)
 
 ## 📚 **Documentation**
 
-- [Getting Started Guide](docs/getting-started.md)
-- [Conditional Relays](docs/conditional-relays.md)
-- [Multi-Relays](docs/multi-relays.md)
-- [Adapter Patterns](docs/adapter-patterns.md)
-- [Adapter Chains](docs/adapter-chains.md)
-- [Performance Guide](docs/performance.md)
-- [Migration Guide](docs/migration-guide.md)
+todo:
 
 ## 🤝 **Contributing**
 
