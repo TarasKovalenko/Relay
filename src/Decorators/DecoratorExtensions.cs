@@ -14,7 +14,7 @@ public static class DecoratorExtensions
         ArgumentNullException.ThrowIfNull(decoratorType);
 
         var registration = services.LastOrDefault(s => s.ServiceType == typeof(TInterface));
-        if (registration == null)
+        if (registration is null)
         {
             throw new InvalidOperationException(
                 $"Service {typeof(TInterface).Name} not registered"
@@ -56,7 +56,7 @@ public static class DecoratorExtensions
         ArgumentNullException.ThrowIfNull(decorator);
 
         var registration = services.LastOrDefault(s => s.ServiceType == typeof(TInterface));
-        if (registration == null)
+        if (registration is null)
         {
             throw new InvalidOperationException(
                 $"Service {typeof(TInterface).Name} not registered"

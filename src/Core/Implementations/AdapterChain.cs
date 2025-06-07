@@ -28,13 +28,14 @@ public sealed class AdapterChain<TResult>(
     private readonly List<AdapterChainStep> _steps =
         steps ?? throw new ArgumentNullException(nameof(steps));
 
-    public TResult Execute<TSource>(TSource source)
+    public TResult Execute<TSource>(TSource? source)
     {
-        if (source == null)
-            throw new ArgumentNullException(nameof(source));
+        ArgumentNullException.ThrowIfNull(source);
 
         if (_steps.Count == 0)
+        {
             throw new InvalidOperationException("Adapter chain has no steps configured");
+        }
 
         object current = source;
         var sourceType = typeof(TSource);
@@ -60,7 +61,7 @@ public sealed class AdapterChain<TResult>(
                 .SelectMany(i => i.GetMethods())
                 .FirstOrDefault(m => m.Name == "Adapt");
 
-            if (adaptMethod == null)
+            if (adaptMethod is null)
             {
                 throw new InvalidOperationException(
                     $"Adapter {step.AdapterType.Name} does not implement IAdapter<,> properly"

@@ -194,23 +194,6 @@ public class Program
         {
             logger.LogInformation("=== Relay Adapter Chain Examples ===");
 
-            // Debug: Check if service is registered
-            var registeredServices = services
-                .Where(s =>
-                    s.ServiceType.IsGenericType
-                    && s.ServiceType.GetGenericTypeDefinition() == typeof(ITypedAdapterChain<,>)
-                )
-                .ToList();
-
-            logger.LogInformation(
-                "Found {Count} ITypedAdapterChain registrations:",
-                registeredServices.Count
-            );
-            foreach (var service in registeredServices)
-            {
-                logger.LogInformation("  - {ServiceType}", service.ServiceType);
-            }
-
             // Example 1: Complex transformation pipeline
             await RunComplexTransformationExample(serviceProvider, logger);
 
