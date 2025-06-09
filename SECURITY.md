@@ -11,7 +11,7 @@ The following versions of Relay are currently being supported with security upda
 
 ## Reporting a Vulnerability
 
-We take the security of CentralConfigGenerator seriously. If you believe you've found a security vulnerability, please follow these steps:
+We take the security of Relay seriously. If you believe you've found a security vulnerability, please follow these steps:
 
 1. **Do not disclose the vulnerability publicly** 
 2. **Open a GitHub issue** with details about the vulnerability
@@ -33,7 +33,7 @@ When you submit a vulnerability report, you can expect:
 
 ## Security Best Practices for Implementation
 
-When implementing CentralConfigGenerator in your applications, consider these security best practices:
+When implementing Relay in your applications, consider these security best practices:
 
 1. **Keep the library updated** to the latest supported version.
 2. **Limit access to configuration files** - ensure configurations with sensitive data have appropriate access controls.
@@ -42,15 +42,6 @@ When implementing CentralConfigGenerator in your applications, consider these se
 5. **Validate all configuration inputs** - never trust input directly without validation.
 6. **Enable logging and monitoring** for configuration access and changes.
 7. **Audit configuration usage** regularly to ensure compliance with security policies.
-
-## Security-related Configuration
-
-CentralConfigGenerator provides several security features:
-
-- **Encryption**: Support for encrypting sensitive configuration values
-- **Access Control**: Granular access control for configuration settings
-- **Validation**: Input validation for configuration values
-- **Audit Logging**: Comprehensive logging of configuration access and modifications
 
 ## Responsible Disclosure
 
