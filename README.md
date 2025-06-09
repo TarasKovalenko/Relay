@@ -6,6 +6,8 @@
 
 Relay your dependency injection to the next level! A powerful, fluent library that extends Microsoft.Extensions.DependencyInjection with adaptive patterns for conditional routing, multi-relays, adapter chains, and dynamic service resolution.
 
+![Relay](https://repository-images.githubusercontent.com/995483153/4675d8d7-ec1b-43ce-8dd5-c6d736a85c70)
+
 ## Terms of use
 
 By using this project or its source code, for any purpose and in any shape or form, you grant your **implicit agreement** to all of the following statements:
