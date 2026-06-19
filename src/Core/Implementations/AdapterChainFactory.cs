@@ -1,14 +1,19 @@
-using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Interfaces;
 
 namespace Relay.Core.Implementations;
 
-public sealed class AdapterChainFactory<TTarget>(List<string> chainNames, IServiceProvider provider)
-    : IAdapterChainFactory<TTarget>
+/// <summary>
+/// Factory that resolves and executes one of several named adapter chains, all producing
+/// the same <typeparamref name="TTarget"/>.
+/// </summary>
+public sealed class AdapterChainFactory<TTarget>(
+    IReadOnlyDictionary<string, Func<IServiceProvider, TTarget>> chains,
+    IServiceProvider provider
+) : IAdapterChainFactory<TTarget>
     where TTarget : class
 {
-    private readonly List<string> _chainNames =
-        chainNames ?? throw new ArgumentNullException(nameof(chainNames));
+    private readonly IReadOnlyDictionary<string, Func<IServiceProvider, TTarget>> _chains =
+        chains ?? throw new ArgumentNullException(nameof(chains));
 
     private readonly IServiceProvider _provider =
         provider ?? throw new ArgumentNullException(nameof(provider));
@@ -20,14 +25,13 @@ public sealed class AdapterChainFactory<TTarget>(List<string> chainNames, IServi
             throw new ArgumentException("Chain name cannot be null or empty", nameof(chainName));
         }
 
-        if (!_chainNames.Contains(chainName))
+        if (!_chains.TryGetValue(chainName, out var chain))
         {
             throw new ArgumentException($"Chain '{chainName}' not found", nameof(chainName));
         }
 
-        // This would need more sophisticated resolution based on the actual chain configuration
-        return _provider.GetRequiredService<TTarget>();
+        return chain(_provider);
     }
 
-    public IEnumerable<string> GetAvailableChains() => _chainNames;
+    public IEnumerable<string> GetAvailableChains() => _chains.Keys;
 }

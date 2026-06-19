@@ -28,8 +28,10 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 - **📡 Multi-Relay Broadcasting**: Execute operations across multiple implementations with various strategies
 - **🔗 True Adapter Pattern**: Seamlessly integrate legacy systems and incompatible interfaces
 - **⛓️ Adapter Chains**: Build complex transformation pipelines (A→B→C→X)
-- **🏭 Relay Factories**: Key-based service creation with flexible configuration
-- **⚡ Performance Optimized**: Efficient resolution with comprehensive lifetime management
+- **🏭 Relay Factories**: Key-based service creation with native keyed-DI support
+- **⏱️ Async Pipelines**: `IAsyncAdapter` chains for non-blocking I/O transformations
+- **🔭 Observability**: Built-in `ActivitySource` tracing for chains and multi-relays
+- **⚡ Performance Optimized**: Cached reflection and lock-free round-robin resolution
 
 ## 🚀 **Quick Start**
 
@@ -37,6 +39,8 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 ```bash
 dotnet add package Relay
 ```
+
+> **Requirements:** .NET 10.0 or later.
 
 ### Basic Usage
 ```csharp
@@ -47,7 +51,8 @@ services.AddRelayServices();
 
 // Basic relay
 services.AddRelay<IPaymentService, StripePaymentRelay>()
-    .WithScopedLifetime();
+    .WithScopedLifetime()
+    .Build();
 
 // Conditional relay
 services.AddConditionalRelay<IPaymentService>()
@@ -69,7 +74,8 @@ services.AddMultiRelay<INotificationService>(config => config
 ```csharp
 services.AddRelay<IPaymentService, StripePaymentRelay>()
     .WithScopedLifetime()
-    .DecorateWith<LoggingDecorator>();
+    .DecorateWith<LoggingDecorator>()
+    .Build();
 ```
 
 ### **2. Conditional Routing**
@@ -107,7 +113,7 @@ services.AddMultiRelay<IStorageService>(config => config
 
 ### **4. True Adapter Pattern** 
 ```csharp
-// Your RefactoringGuru example becomes:
+// Wrap an incompatible service in an adapter
 services.AddAdapter<ITarget, Adaptee>()
     .WithScopedLifetime()
     .Using<Adapter>();
@@ -139,6 +145,21 @@ services.AddTypedAdapterChain<XmlData, DomainModel>()
     .Then<DataDto, JsonToDtoAdapter>()  
     .Then<DomainModel, DtoToDomainAdapter>()
     .Build();
+
+// Named chains — several pipelines producing the same result, picked by name at runtime.
+// The source instance is resolved from the container.
+services.AddSingleton(new RawData(...));
+services.AddAdapterChainFactory<ISettings>()
+    .AddChain("full")
+        .From<RawData>().Then<Validated, ValidateAdapter>().Finally<SettingsAdapter>()
+    .AddChain("fast")
+        .From<RawData>().Finally<DirectSettingsAdapter>()
+    .AddChain("mock", _ => new MockSettings())   // or a plain producer delegate
+    .Build();
+
+var factory = serviceProvider.GetRequiredService<IAdapterChainFactory<ISettings>>();
+var settings = factory.CreateFromChain("full");
+var names    = factory.GetAvailableChains();   // ["full", "fast", "mock"]
 ```
 
 ### **6. Relay Factory**
@@ -179,6 +200,72 @@ services.AddMultiRelay<INotificationService>(config => config
 ).Build();
 ```
 
+### **9. Async Adapter Chains**
+For transformation pipelines that perform I/O (HTTP, database, file access), use async adapters so steps never block a thread.
+```csharp
+public class FetchAdapter : IAsyncAdapter<OrderId, OrderDto>
+{
+    public async Task<OrderDto> AdaptAsync(OrderId id, CancellationToken ct = default)
+        => await _api.GetOrderAsync(id, ct);
+}
+
+services.AddAsyncAdapterChain<Invoice>()
+    .From<OrderId>()
+    .Then<OrderDto, FetchAdapter>()      // OrderId → OrderDto (async I/O)
+    .Then<EnrichedOrder, EnrichAdapter>()
+    .Finally<InvoiceAdapter>()
+    .Build();
+
+// Usage
+var chain = serviceProvider.GetRequiredService<IAsyncAdapterChain<Invoice>>();
+var invoice = await chain.ExecuteAsync(new OrderId(42), cancellationToken);
+```
+
+### **10. Context-Aware Resolution**
+`IRelayResolver` now flows an explicit `IRelayContext` into conditional relays and factories, so routing decisions can be made per call.
+```csharp
+services.AddRelayServices();
+services.AddConditionalRelay<IPaymentService>()
+    .When(ctx => (string)ctx.Properties["tier"] == "premium").RelayTo<PremiumPayment>()
+    .Otherwise<StandardPayment>()
+    .Build();
+
+var resolver = scope.ServiceProvider.GetRequiredService<IRelayResolver>();
+var ctx = new DefaultRelayContext(scope.ServiceProvider);
+ctx.Properties["tier"] = "premium";
+var payment = resolver.Resolve<IPaymentService>(ctx);   // → PremiumPayment
+
+// Factories can pick a key from the context too
+services.AddRelayFactory<IPaymentService>(f => f
+    .RegisterKeyedRelay<StripeRelay>("stripe")
+    .RegisterKeyedRelay<PayPalRelay>("paypal")
+    .SelectKeyByContext(c => (string)c.Properties["provider"])
+    .SetDefaultRelay("stripe")
+).Build();
+var svc = factory.CreateRelay(ctx);   // key chosen from ctx.Properties["provider"]
+```
+
+### **11. Native Keyed Services**
+Register relays against a service key using built-in .NET keyed DI — resolve them with `[FromKeyedServices]` or `GetRequiredKeyedService`.
+```csharp
+services.AddKeyedRelay<IPaymentService, StripeRelay>("stripe");
+services.AddKeyedRelay<IPaymentService, PayPalRelay>("paypal");
+
+// Resolve directly from the container
+var stripe = serviceProvider.GetRequiredKeyedService<IPaymentService>("stripe");
+
+// ...or inject by key
+public class CheckoutController([FromKeyedServices("paypal")] IPaymentService payment) { }
+```
+
+### **12. Built-in Observability**
+Adapter chains and multi-relays emit `System.Diagnostics.Activity` traces from an `ActivitySource` named `Relay`. Activities are only created when a listener is attached, so overhead is zero otherwise.
+```csharp
+// OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource(RelayDiagnostics.SourceName));
+```
+
 ## 🎯 **Real-World Use Cases**
 
 ### **1. Multi-Environment Deployments**
@@ -206,43 +293,6 @@ services.AddMultiRelay<INotificationService>(config => config
 - Logging (Console, File, Database, Cloud)
 - Caching (Memory, Redis, Database)
 
-## 🔧 **Advanced Features**
-
-### **Conditional Chain Selection**
-```csharp
-services.AddConditionalAdapterChain<IUserService>()
-    .When(ctx => ctx.Environment == "Development")
-    .UseChain(chain => chain
-        .From<MockDatabase>()
-        .Finally<MockUserService>())
-    .When(ctx => ctx.Environment == "Production") 
-    .UseChain(chain => chain
-        .From<LegacyDatabase>()
-        .Then<IModernOrm, LegacyToOrmAdapter>()
-        .Then<IRepository<User>, OrmToRepositoryAdapter<User>>()
-        .Finally<RepositoryToServiceAdapter>())
-    .Build();
-```
-
-### **Parallel Chain Execution**
-```csharp
-services.AddParallelAdapterChains<IDataProcessor>()
-    .AddChain("fast", chain => chain
-        .From<RawData>()
-        .Then<CachedData, FastCacheAdapter>()
-        .Finally<FastProcessorAdapter>())
-    .AddChain("thorough", chain => chain
-        .From<RawData>()
-        .Then<ValidatedData, ValidationAdapter>()
-        .Then<EnrichedData, EnrichmentAdapter>()
-        .Finally<ThoroughProcessorAdapter>())
-    .Build();
-
-// Usage
-var chainFactory = serviceProvider.GetService<IAdapterChainFactory<IDataProcessor>>();
-var processor = chainFactory.CreateFromChain("thorough");
-```
-
 ## 🏗️ **Architecture Benefits**
 
 ### **✅ Clean Separation of Concerns**
@@ -263,7 +313,7 @@ var processor = chainFactory.CreateFromChain("thorough");
 ### **✅ Enterprise Ready**
 - Thread-safe operations
 - Comprehensive error handling
-- Extensive logging support
+- Built-in distributed tracing via `ActivitySource`
 
 ## 🧪 **Testing Support**
 
@@ -288,7 +338,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="1.0.3" />
+<PackageReference Include="Relay" Version="1.1.0" />
 ```
 
 ### **Basic Setup**
@@ -310,7 +360,9 @@ public void ConfigureServices(IServiceCollection services)
 
 ## 📚 **Documentation**
 
-todo:
+Runnable samples for every feature live in the [`examples/`](examples) directory — including
+basic relays, conditional routing, multi-relay strategies, adapter chains, async chains, and
+factories. The [`tests/`](tests) project doubles as executable documentation of the full API.
 
 ## 🤝 **Contributing**
 

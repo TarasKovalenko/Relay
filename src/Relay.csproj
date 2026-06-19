@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net9.0;</TargetFrameworks>
+        <TargetFrameworks>net10.0;</TargetFrameworks>
         <PackageId>Relay</PackageId>
         <Title>Relay - Adaptive Dependency Injection</Title>
-        <Version>1.0.3</Version>
+        <Version>1.1.0</Version>
         <Authors>Taras Kovalenko</Authors>
         <Copyright>Copyright Taras Kovalenko</Copyright>
         <Product>Relay</Product>

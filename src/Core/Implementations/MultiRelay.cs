@@ -1,5 +1,6 @@
 using Relay.Core.Enums;
 using Relay.Core.Interfaces;
+using Relay.Diagnostics;
 
 namespace Relay.Core.Implementations;
 
@@ -9,7 +10,6 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
     private readonly List<TInterface> _relays;
     private readonly RelayStrategy _strategy;
     private int _roundRobinIndex;
-    private readonly object _lockObject = new();
 
     public MultiRelay(IEnumerable<TInterface> relays, RelayStrategy strategy)
     {
@@ -26,6 +26,10 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
     {
         ArgumentNullException.ThrowIfNull(operation);
 
+        using var activity = RelayDiagnostics.ActivitySource.StartActivity("MultiRelay.RelayToAllWithResults");
+        activity?.SetTag("relay.strategy", _strategy.ToString());
+        activity?.SetTag("relay.count", _relays.Count);
+
         return _strategy switch
         {
             RelayStrategy.Broadcast => await ExecuteBroadcast(operation),
@@ -40,6 +44,10 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
     public async Task RelayToAll(Func<TInterface, Task> operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
+
+        using var activity = RelayDiagnostics.ActivitySource.StartActivity("MultiRelay.RelayToAll");
+        activity?.SetTag("relay.strategy", _strategy.ToString());
+        activity?.SetTag("relay.count", _relays.Count);
 
         switch (_strategy)
         {
@@ -71,12 +79,10 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
             throw new InvalidOperationException("No relays available");
         }
 
-        lock (_lockObject)
-        {
-            var relay = _relays[_roundRobinIndex % _relays.Count];
-            _roundRobinIndex++;
-            return Task.FromResult(relay);
-        }
+        // Lock-free round-robin: atomically grab and advance the index.
+        var index = Interlocked.Increment(ref _roundRobinIndex) - 1;
+        var relay = _relays[(int)((uint)index % (uint)_relays.Count)];
+        return Task.FromResult(relay);
     }
 
     private async Task<IEnumerable<TResult>> ExecuteBroadcast<TResult>(
