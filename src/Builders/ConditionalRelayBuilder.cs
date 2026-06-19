@@ -57,8 +57,12 @@ public sealed class ConditionalRelayBuilder<TInterface>(IServiceCollection servi
                 typeof(TInterface),
                 provider =>
                 {
+                    // Prefer an explicit context flowed in via the resolver, then the registered
+                    // scoped context, then a freshly built default.
                     var context =
-                        provider.GetService<IRelayContext>() ?? new DefaultRelayContext(provider);
+                        provider.GetService<IRelayContextAccessor>()?.Current
+                        ?? provider.GetService<IRelayContext>()
+                        ?? new DefaultRelayContext(provider);
 
                     var registration = _registrations.FirstOrDefault(r => r.Condition(context));
                     if (registration is null)

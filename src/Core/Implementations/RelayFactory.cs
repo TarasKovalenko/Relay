@@ -5,7 +5,8 @@ namespace Relay.Core.Implementations;
 public sealed class RelayFactory<TInterface>(
     IReadOnlyDictionary<string, Func<IServiceProvider, TInterface>> factories,
     IServiceProvider serviceProvider,
-    string? defaultKey
+    string? defaultKey,
+    Func<IRelayContext, string>? contextKeySelector = null
 ) : IRelayFactory<TInterface>
     where TInterface : class
 {
@@ -34,7 +35,12 @@ public sealed class RelayFactory<TInterface>(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        // Default implementation - can be overridden for context-based selection
+        // Use the configured context-based selector to pick a key; fall back to the default relay.
+        if (contextKeySelector is not null)
+        {
+            return CreateRelay(contextKeySelector(context));
+        }
+
         return GetDefaultRelay();
     }
 

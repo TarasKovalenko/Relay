@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Relay.Builders;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
@@ -38,6 +39,32 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         return new RelayRegistrationBuilder<TInterface>(services, typeof(TImplementation));
+    }
+
+    /// <summary>
+    /// Register a relay against a service key using native .NET keyed dependency injection.
+    /// Resolve it with <c>[FromKeyedServices(key)]</c> or
+    /// <c>GetRequiredKeyedService&lt;TInterface&gt;(key)</c>.
+    /// </summary>
+    public static IServiceCollection AddKeyedRelay<TInterface, TImplementation>(
+        this IServiceCollection services,
+        object? serviceKey,
+        ServiceLifetime lifetime = ServiceLifetime.Scoped
+    )
+        where TInterface : class
+        where TImplementation : class, TInterface
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.Add(
+            new ServiceDescriptor(
+                typeof(TInterface),
+                serviceKey,
+                typeof(TImplementation),
+                lifetime
+            )
+        );
+        return services;
     }
 
     /// <summary>
@@ -96,6 +123,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IRelayContext, DefaultRelayContext>();
         services.AddScoped<IRelayResolver, RelayResolver>();
+        services.TryAddScoped<IRelayContextAccessor, RelayContextAccessor>();
         return services;
     }
 
@@ -108,6 +136,29 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         return new AdapterChainBuilder<TResult>(services);
+    }
+
+    /// <summary>
+    /// Register an asynchronous adapter chain for transformation pipelines that perform I/O.
+    /// </summary>
+    public static AsyncAdapterChainBuilder<TResult> AddAsyncAdapterChain<TResult>(
+        this IServiceCollection services
+    )
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return new AsyncAdapterChainBuilder<TResult>(services);
+    }
+
+    /// <summary>
+    /// Register a factory that exposes several named adapter chains, all producing the same result.
+    /// </summary>
+    public static AdapterChainFactoryBuilder<TTarget> AddAdapterChainFactory<TTarget>(
+        this IServiceCollection services
+    )
+        where TTarget : class
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return new AdapterChainFactoryBuilder<TTarget>(services);
     }
 
     /// <summary>

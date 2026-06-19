@@ -12,6 +12,24 @@ public sealed class RelayResolver(IServiceProvider serviceProvider) : IRelayReso
         where TInterface : class
     {
         context ??= new DefaultRelayContext(_serviceProvider);
-        return _serviceProvider.GetRequiredService<TInterface>();
+
+        // Flow the context into the ambient accessor so conditional relays and factories
+        // resolved below can route based on it, then restore the previous value.
+        var accessor = _serviceProvider.GetService<IRelayContextAccessor>();
+        if (accessor is null)
+        {
+            return _serviceProvider.GetRequiredService<TInterface>();
+        }
+
+        var previous = accessor.Current;
+        accessor.Current = context;
+        try
+        {
+            return _serviceProvider.GetRequiredService<TInterface>();
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
     }
 }
