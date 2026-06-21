@@ -29,6 +29,7 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 - **🔗 True Adapter Pattern**: Seamlessly integrate legacy systems and incompatible interfaces
 - **⛓️ Adapter Chains**: Build complex transformation pipelines (A→B→C→X)
 - **🏭 Relay Factories**: Key-based service creation with native keyed-DI support
+- **🛡️ Resilience**: Failover with per-relay retry and exponential backoff
 - **⏱️ Async Pipelines**: `IAsyncAdapter` chains for non-blocking I/O transformations
 - **🔭 Observability**: Built-in `ActivitySource` tracing for chains and multi-relays
 - **⚡ Performance Optimized**: Cached reflection and lock-free round-robin resolution
@@ -102,12 +103,14 @@ services.AddMultiRelay<INotificationService>(config => config
     .WithStrategy(RelayStrategy.Broadcast)
 ).Build();
 
-// Failover strategy
+// Failover strategy with retry (transient-fault resilience). Each provider is retried
+// up to maxAttempts with exponential backoff before failing over to the next one.
 services.AddMultiRelay<IStorageService>(config => config
     .AddRelay<PrimaryStorageService>()
     .AddRelay<SecondaryStorageService>()
     .AddRelay<BackupStorageService>()
     .WithStrategy(RelayStrategy.Failover)
+    .WithRetry(maxAttempts: 3, delay: TimeSpan.FromMilliseconds(100), backoffFactor: 2.0)
 ).Build();
 ```
 
@@ -164,16 +167,21 @@ var names    = factory.GetAvailableChains();   // ["full", "fast", "mock"]
 
 ### **6. Relay Factory**
 ```csharp
+// Implementations and their dependencies are created by DI — no manual `new`.
 services.AddRelayFactory<IPaymentService>(factory => factory
-    .RegisterRelay("stripe", provider => new StripeRelay())
-    .RegisterRelay("paypal", provider => new PayPalRelay())
-    .RegisterRelay("crypto", provider => new CryptoRelay())
+    .RegisterRelay<StripeRelay>("stripe")
+    .RegisterRelay<PayPalRelay>("paypal")
+    .RegisterRelay<CryptoRelay>("crypto")
     .SetDefaultRelay("stripe")
 ).Build();
 
 // Usage
-var factory = serviceProvider.GetService<IRelayFactory<IPaymentService>>();
+var factory = serviceProvider.GetRequiredService<IRelayFactory<IPaymentService>>();
 var paymentService = factory.CreateRelay("stripe");
+
+// Escape hatch: the Func<IServiceProvider, T> overload is only for objects that cannot be
+// resolved from the container (e.g. third-party SDK clients):
+//   .RegisterRelay("legacy", sp => new LegacyRelay(sp.GetRequiredService<HttpClient>()))
 ```
 
 ### **7. Auto-Discovery**
@@ -338,7 +346,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="1.1.0" />
+<PackageReference Include="Relay" Version="1.2.0" />
 ```
 
 ### **Basic Setup**
@@ -360,9 +368,15 @@ public void ConfigureServices(IServiceCollection services)
 
 ## 📚 **Documentation**
 
-Runnable samples for every feature live in the [`examples/`](examples) directory — including
-basic relays, conditional routing, multi-relay strategies, adapter chains, async chains, and
-factories. The [`tests/`](tests) project doubles as executable documentation of the full API.
+Runnable samples for every feature live in the [`examples/`](examples) directory. Production-oriented
+ones worth starting with:
+
+- **Resilience** — failover across storage providers with retry + exponential backoff
+- **Observability** — tracing an adapter chain via `ActivitySource` / OpenTelemetry
+- **ContextRouting** — multi-tenant routing that picks an implementation per request from `IRelayContext`
+- **AsyncChain** — non-blocking I/O transformation pipeline
+
+The [`tests/`](tests) project doubles as executable documentation of the full API.
 
 ## 🤝 **Contributing**
 

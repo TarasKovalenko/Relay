@@ -73,8 +73,12 @@ public sealed class ConditionalRelayBuilder<TInterface>(IServiceCollection servi
                     }
                     var implementationType =
                         registration.ImplementationType ?? registration.TypeSelector!(context);
-                    return (TInterface)
-                        ActivatorUtilities.CreateInstance(provider, implementationType);
+                    // Reuse an existing DI registration (and its lifetime) when the implementation
+                    // is registered; otherwise create it with its constructor dependencies resolved.
+                    var instance =
+                        provider.GetService(implementationType)
+                        ?? ActivatorUtilities.CreateInstance(provider, implementationType);
+                    return (TInterface)instance;
                 },
                 _lifetime
             )

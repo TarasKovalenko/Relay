@@ -35,6 +35,7 @@ public class MultiRelayBuilderTests : TestBase
 
         // Act
         var result = builder.AddRelay<TestServiceA>();
+        builder.Build();
 
         // Assert
         result.ShouldBe(builder);
@@ -49,6 +50,7 @@ public class MultiRelayBuilderTests : TestBase
 
         // Act
         var result = builder.AddRelay<TestServiceA>(ServiceLifetime.Singleton);
+        builder.Build();
 
         // Assert
         result.ShouldBe(builder);

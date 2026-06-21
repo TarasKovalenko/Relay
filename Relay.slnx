@@ -1,0 +1,32 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Examples/">
+    <Project Path="examples/Relay.Examples.Adapter/Relay.Examples.Adapter.csproj" />
+    <Project Path="examples/Relay.Examples.AdapterChain/Relay.Examples.AdapterChain.csproj" />
+    <Project Path="examples/Relay.Examples.AdapterFactory/Relay.Examples.AdapterFactory.csproj" />
+    <Project Path="examples/Relay.Examples.AdvancedDecorator/Relay.Examples.AdvancedDecorator.csproj" />
+    <Project Path="examples/Relay.Examples.AsyncChain/Relay.Examples.AsyncChain.csproj" />
+    <Project Path="examples/Relay.Examples.Basic/Relay.Examples.Basic.csproj" />
+    <Project Path="examples/Relay.Examples.Conditional/Relay.Examples.Conditional.csproj" />
+    <Project Path="examples/Relay.Examples.ConditionalRouting/Relay.Examples.ConditionalRouting.csproj" />
+    <Project Path="examples/Relay.Examples.ContextRouting/Relay.Examples.ContextRouting.csproj" />
+    <Project Path="examples/Relay.Examples.DecorateWith/Relay.Examples.DecorateWith.csproj" />
+    <Project Path="examples/Relay.Examples.Factory/Relay.Examples.Factory.csproj" />
+    <Project Path="examples/Relay.Examples.Integration/Relay.Examples.Integration.csproj" />
+    <Project Path="examples/Relay.Examples.MultiBroadcasting/Relay.Examples.MultiBroadcasting.csproj" />
+    <Project Path="examples/Relay.Examples.MultiFailover/Relay.Examples.MultiFailover.csproj" />
+    <Project Path="examples/Relay.Examples.Observability/Relay.Examples.Observability.csproj" />
+    <Project Path="examples/Relay.Examples.ParallelWithResults/Relay.Examples.ParallelWithResults.csproj" />
+    <Project Path="examples/Relay.Examples.Resilience/Relay.Examples.Resilience.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Relay.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Relay.Tests/Relay.Tests.csproj" />
+  </Folder>
+</Solution>

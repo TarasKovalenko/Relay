@@ -2,6 +2,7 @@
 using Relay.Core.Enums;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
+using Relay.Core.Options;
 
 namespace Relay.Builders;
 
@@ -15,17 +16,18 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
 
     private RelayStrategy _strategy = RelayStrategy.Broadcast;
 
+    private RelayResilienceOptions _resilience = RelayResilienceOptions.None;
+
     private ServiceLifetime _lifetime = ServiceLifetime.Scoped;
 
     public MultiRelayBuilder<TInterface> AddRelay<TRelay>(ServiceLifetime? lifetime = null)
         where TRelay : class, TInterface
     {
-        var relayLifetime = lifetime ?? _lifetime;
+        // Registration is materialized in Build() so a later WithDefaultLifetime still applies
+        // to relays added without an explicit lifetime.
         _relayRegistrations.Add(
-            new RelayRegistration { ImplementationType = typeof(TRelay), Lifetime = relayLifetime }
+            new RelayRegistration { ImplementationType = typeof(TRelay), Lifetime = lifetime }
         );
-
-        _services.Add(new ServiceDescriptor(typeof(TRelay), typeof(TRelay), relayLifetime));
         return this;
     }
 
@@ -65,19 +67,60 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
         return this;
     }
 
+    /// <summary>
+    /// Retry each relay up to <paramref name="maxAttempts"/> times (with optional delay and
+    /// exponential backoff) before failing over to the next relay. Applies to the
+    /// <see cref="RelayStrategy.Failover"/> and <see cref="RelayStrategy.FirstSuccessful"/> strategies.
+    /// </summary>
+    public MultiRelayBuilder<TInterface> WithRetry(
+        int maxAttempts,
+        TimeSpan? delay = null,
+        double backoffFactor = 1.0
+    )
+    {
+        if (maxAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxAttempts),
+                "maxAttempts must be at least 1"
+            );
+        }
+
+        _resilience = new RelayResilienceOptions
+        {
+            MaxAttempts = maxAttempts,
+            Delay = delay ?? TimeSpan.Zero,
+            BackoffFactor = backoffFactor,
+        };
+        return this;
+    }
+
     public IServiceCollection Build()
     {
+        // Materialize each relay registration with its explicit lifetime, or the final default.
+        foreach (var reg in _relayRegistrations)
+        {
+            _services.Add(
+                new ServiceDescriptor(
+                    reg.ImplementationType,
+                    reg.ImplementationType,
+                    reg.Lifetime ?? _lifetime
+                )
+            );
+        }
+
+        var registrations = _relayRegistrations.ToList();
         _services.Add(
             new ServiceDescriptor(
                 typeof(IMultiRelay<TInterface>),
                 provider =>
                 {
-                    var relays = _relayRegistrations
-                        .Select(reg => provider.GetService(reg.ImplementationType))
-                        .OfType<TInterface>()
+                    // Fail loud if a relay cannot be resolved rather than silently dropping it.
+                    var relays = registrations
+                        .Select(reg => (TInterface)provider.GetRequiredService(reg.ImplementationType))
                         .ToList();
 
-                    return new MultiRelay<TInterface>(relays, _strategy);
+                    return new MultiRelay<TInterface>(relays, _strategy, _resilience);
                 },
                 _lifetime
             )
@@ -89,6 +132,6 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
     private sealed class RelayRegistration
     {
         public Type ImplementationType { get; set; } = null!;
-        public ServiceLifetime Lifetime { get; set; }
+        public ServiceLifetime? Lifetime { get; set; }
     }
 }

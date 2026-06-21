@@ -12,12 +12,21 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
 
     private readonly Dictionary<string, Func<IServiceProvider, TInterface>> _factories = new();
 
+    // Type-based registrations are materialized in Build() so the configured lifetime applies
+    // regardless of the order WithLifetime/RegisterRelay are called in.
+    private readonly List<(Type ImplType, bool Keyed, string Key)> _typeRegistrations = [];
+
     private string? _defaultKey;
 
     private Func<IRelayContext, string>? _contextKeySelector;
 
     private ServiceLifetime _lifetime = ServiceLifetime.Scoped;
 
+    /// <summary>
+    /// Register a relay via a factory delegate. Escape hatch for types that are not resolvable
+    /// from the container (e.g. third-party objects). Prefer <see cref="RegisterRelay{TImplementation}"/>
+    /// so the relay and its dependencies are created by DI.
+    /// </summary>
     public RelayFactoryBuilder<TInterface> RegisterRelay(
         string key,
         Func<IServiceProvider, TInterface> factory
@@ -34,6 +43,10 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
         return this;
     }
 
+    /// <summary>
+    /// Register a relay implementation resolved from the container. The implementation and its
+    /// dependencies are created by DI using the configured lifetime.
+    /// </summary>
     public RelayFactoryBuilder<TInterface> RegisterRelay<TImplementation>(string key)
         where TImplementation : class, TInterface
     {
@@ -42,8 +55,8 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
             throw new ArgumentException("Key cannot be null or empty", nameof(key));
         }
 
-        _factories[key] = provider => provider.GetRequiredService<TImplementation>();
-        _services.AddScoped<TImplementation>();
+        _factories[key] = static provider => provider.GetRequiredService<TImplementation>();
+        _typeRegistrations.Add((typeof(TImplementation), false, key));
         return this;
     }
 
@@ -61,10 +74,8 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
             throw new ArgumentException("Key cannot be null or empty", nameof(key));
         }
 
-        _services.Add(
-            new ServiceDescriptor(typeof(TInterface), key, typeof(TImplementation), _lifetime)
-        );
         _factories[key] = provider => provider.GetRequiredKeyedService<TInterface>(key);
+        _typeRegistrations.Add((typeof(TImplementation), true, key));
         return this;
     }
 
@@ -98,6 +109,16 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
 
     public IServiceCollection Build()
     {
+        // Materialize type-based registrations with the final configured lifetime.
+        foreach (var (implType, keyed, key) in _typeRegistrations)
+        {
+            _services.Add(
+                keyed
+                    ? new ServiceDescriptor(typeof(TInterface), key, implType, _lifetime)
+                    : new ServiceDescriptor(implType, implType, _lifetime)
+            );
+        }
+
         _services.Add(
             new ServiceDescriptor(
                 typeof(IRelayFactory<TInterface>),
