@@ -1,5 +1,6 @@
 using Relay.Core.Enums;
 using Relay.Core.Interfaces;
+using Relay.Core.Options;
 using Relay.Diagnostics;
 
 namespace Relay.Core.Implementations;
@@ -9,13 +10,30 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
 {
     private readonly List<TInterface> _relays;
     private readonly RelayStrategy _strategy;
+    private readonly RelayResilienceOptions _resilience;
     private int _roundRobinIndex;
 
     public MultiRelay(IEnumerable<TInterface> relays, RelayStrategy strategy)
+        : this(relays, strategy, RelayResilienceOptions.None) { }
+
+    public MultiRelay(
+        IEnumerable<TInterface> relays,
+        RelayStrategy strategy,
+        RelayResilienceOptions resilience
+    )
     {
         ArgumentNullException.ThrowIfNull(relays);
+        ArgumentNullException.ThrowIfNull(resilience);
+        if (resilience.MaxAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(resilience),
+                "MaxAttempts must be at least 1"
+            );
+        }
         _relays = relays.ToList();
         _strategy = strategy;
+        _resilience = resilience;
     }
 
     public IEnumerable<TInterface> GetRelays() => _relays;
@@ -106,7 +124,7 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
         {
             try
             {
-                return await operation(relay);
+                return await ExecuteWithRetry(relay, operation);
             }
             catch (Exception ex)
             {
@@ -123,7 +141,14 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
         {
             try
             {
-                await operation(relay);
+                await ExecuteWithRetry(
+                    relay,
+                    async r =>
+                    {
+                        await operation(r);
+                        return true;
+                    }
+                );
                 return;
             }
             catch (Exception ex)
@@ -132,6 +157,38 @@ public sealed class MultiRelay<TInterface> : IMultiRelay<TInterface>
             }
         }
         throw new InvalidOperationException("No relay succeeded", lastException);
+    }
+
+    /// <summary>
+    /// Invokes <paramref name="operation"/> on a single relay, retrying up to
+    /// <c>MaxAttempts</c> times with the configured delay/backoff before giving up.
+    /// </summary>
+    private async Task<TResult> ExecuteWithRetry<TResult>(
+        TInterface relay,
+        Func<TInterface, Task<TResult>> operation
+    )
+    {
+        var delay = _resilience.Delay;
+        Exception? lastException = null;
+
+        for (var attempt = 1; attempt <= _resilience.MaxAttempts; attempt++)
+        {
+            try
+            {
+                return await operation(relay);
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                if (attempt < _resilience.MaxAttempts && delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay);
+                    delay *= _resilience.BackoffFactor;
+                }
+            }
+        }
+
+        throw lastException!;
     }
 
     private async Task<TResult> ExecuteFailover<TResult>(Func<TInterface, Task<TResult>> operation)

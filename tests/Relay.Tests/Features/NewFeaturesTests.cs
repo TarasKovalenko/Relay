@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Relay.Builders;
+using Relay.Core.Enums;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
+using Relay.Core.Options;
 using Relay.Diagnostics;
 using Shouldly;
 
@@ -158,6 +161,122 @@ public class NewFeaturesTests
         var ctx = new DefaultRelayContext(scope.ServiceProvider);
         ctx.Properties["key"] = "b";
         factory.CreateRelay(ctx).ShouldBeOfType<TestServiceB>();
+    }
+
+    // ---- Lifetime-ordering fixes ----
+    [Fact]
+    public void RelayFactory_WithLifetimeAfterRegister_AppliesLifetime()
+    {
+        var services = new ServiceCollection();
+        new RelayFactoryBuilder<ITestService>(services)
+            .RegisterRelay<TestServiceA>("a")
+            .WithLifetime(ServiceLifetime.Singleton) // called AFTER RegisterRelay
+            .Build();
+
+        var descriptor = services.First(s => s.ServiceType == typeof(TestServiceA));
+        descriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void MultiRelay_WithDefaultLifetimeAfterAddRelay_AppliesLifetime()
+    {
+        var services = new ServiceCollection();
+        new MultiRelayBuilder<ITestService>(services)
+            .AddRelay<TestServiceA>()
+            .WithDefaultLifetime(ServiceLifetime.Singleton) // called AFTER AddRelay
+            .WithStrategy(RelayStrategy.Broadcast)
+            .Build();
+
+        var descriptor = services.First(s => s.ServiceType == typeof(TestServiceA));
+        descriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void MultiRelay_ExplicitRelayLifetime_OverridesDefault()
+    {
+        var services = new ServiceCollection();
+        new MultiRelayBuilder<ITestService>(services)
+            .WithDefaultLifetime(ServiceLifetime.Singleton)
+            .AddRelay<TestServiceA>(ServiceLifetime.Transient)
+            .Build();
+
+        var descriptor = services.First(s => s.ServiceType == typeof(TestServiceA));
+        descriptor.Lifetime.ShouldBe(ServiceLifetime.Transient);
+    }
+
+    // ---- Resilience / retry ----
+    public interface IFlaky
+    {
+        Task<string> CallAsync();
+    }
+
+    public sealed class FlakyRelay(int failUntil, string id) : IFlaky
+    {
+        public int Calls { get; private set; }
+
+        public Task<string> CallAsync()
+        {
+            Calls++;
+            if (Calls <= failUntil)
+            {
+                throw new InvalidOperationException("transient");
+            }
+            return Task.FromResult(id);
+        }
+    }
+
+    [Fact]
+    public async Task Retry_RecoversTransientFailureOnSameRelay()
+    {
+        var relay = new FlakyRelay(failUntil: 2, id: "A");
+        var multi = new MultiRelay<IFlaky>(
+            [relay],
+            RelayStrategy.FirstSuccessful,
+            new RelayResilienceOptions { MaxAttempts = 3 }
+        );
+
+        var result = await multi.RelayToAllWithResults(r => r.CallAsync());
+
+        result.Single().ShouldBe("A");
+        relay.Calls.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task NoRetry_FailsOverToNextRelay()
+    {
+        var bad = new FlakyRelay(int.MaxValue, "bad");
+        var good = new FlakyRelay(0, "good");
+        var multi = new MultiRelay<IFlaky>([bad, good], RelayStrategy.Failover);
+
+        var result = await multi.RelayToAllWithResults(r => r.CallAsync());
+
+        result.Single().ShouldBe("good");
+    }
+
+    [Fact]
+    public async Task Retry_Exhausted_ThenFailsOver()
+    {
+        var bad = new FlakyRelay(int.MaxValue, "bad");
+        var good = new FlakyRelay(0, "good");
+        var multi = new MultiRelay<IFlaky>(
+            [bad, good],
+            RelayStrategy.Failover,
+            new RelayResilienceOptions { MaxAttempts = 2 }
+        );
+
+        var result = await multi.RelayToAllWithResults(r => r.CallAsync());
+
+        result.Single().ShouldBe("good");
+        bad.Calls.ShouldBe(2); // retried twice before failover
+    }
+
+    [Fact]
+    public void WithRetry_InvalidAttempts_Throws()
+    {
+        var services = new ServiceCollection();
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new MultiRelayBuilder<IFlaky>(services).WithRetry(0)
+        );
     }
 
     // ---- Diagnostics ----
