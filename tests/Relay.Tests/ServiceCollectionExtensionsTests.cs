@@ -205,7 +205,9 @@ public class ServiceCollectionExtensionsTests : TestBase
         services.AddRelayServices(); // Call twice
 
         // Assert
-        services.Count(s => s.ServiceType == typeof(IRelayContext)).ShouldBe(2); // Will have duplicates, that's expected
-        services.Count(s => s.ServiceType == typeof(IRelayResolver)).ShouldBe(2);
+        services.Count(s => s.ServiceType == typeof(IRelayContext)).ShouldBe(1);
+        services.Count(s => s.ServiceType == typeof(IRelayResolver)).ShouldBe(1);
+        services.Count(s => s.ServiceType == typeof(IRelayContextAccessor)).ShouldBe(1);
+        services.Count(s => s.ServiceType == typeof(IRelayScopeRunner)).ShouldBe(1);
     }
 }

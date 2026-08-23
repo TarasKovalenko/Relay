@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Enums;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
@@ -20,7 +21,9 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
 
     private ServiceLifetime _lifetime = ServiceLifetime.Scoped;
 
-    public MultiRelayBuilder<TInterface> AddRelay<TRelay>(ServiceLifetime? lifetime = null)
+    public MultiRelayBuilder<TInterface> AddRelay<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TRelay
+    >(ServiceLifetime? lifetime = null)
         where TRelay : class, TInterface
     {
         // Registration is materialized in Build() so a later WithDefaultLifetime still applies
@@ -120,7 +123,9 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
                         .Select(reg => (TInterface)provider.GetRequiredService(reg.ImplementationType))
                         .ToList();
 
-                    return new MultiRelay<TInterface>(relays, _strategy, _resilience);
+                    // Honour a registered TimeProvider so retry backoff is testable.
+                    var timeProvider = provider.GetService<TimeProvider>() ?? TimeProvider.System;
+                    return new MultiRelay<TInterface>(relays, _strategy, _resilience, timeProvider);
                 },
                 _lifetime
             )
@@ -131,6 +136,7 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
 
     private sealed class RelayRegistration
     {
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
         public Type ImplementationType { get; set; } = null!;
         public ServiceLifetime? Lifetime { get; set; }
     }

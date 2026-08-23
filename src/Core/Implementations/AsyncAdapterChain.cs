@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Interfaces;
@@ -21,8 +22,11 @@ public sealed class AsyncAdapterChain<TResult>(
         steps ?? throw new ArgumentNullException(nameof(steps));
 
     // Cache the resolved AdaptAsync MethodInfo and its Task<T>.Result getter per adapter type.
-    private static readonly ConcurrentDictionary<Type, (MethodInfo Method, PropertyInfo Result)> AdaptAsyncCache =
-        new();
+    // Only used by the reflection fallback for steps built outside the Relay builders.
+    private static readonly ConcurrentDictionary<
+        Type,
+        (MethodInfo Method, PropertyInfo Result)
+    > AdaptAsyncCache = new();
 
     public async Task<TResult> ExecuteAsync<TSource>(
         TSource source,
@@ -47,55 +51,29 @@ public sealed class AsyncAdapterChain<TResult>(
             );
         }
 
-        using var chainActivity = RelayDiagnostics.ActivitySource.StartActivity("AsyncAdapterChain.Execute");
+        using var chainActivity = RelayDiagnostics.ActivitySource.StartActivity(
+            "AsyncAdapterChain.Execute"
+        );
         chainActivity?.SetTag("relay.chain.result_type", typeof(TResult).Name);
         chainActivity?.SetTag("relay.chain.source_type", sourceType.Name);
         chainActivity?.SetTag("relay.chain.steps", _steps.Count);
 
         foreach (var step in _steps)
         {
-            using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity("AsyncAdapterChain.Step");
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity(
+                "AsyncAdapterChain.Step"
+            );
             stepActivity?.SetTag("relay.adapter", step.AdapterType.Name);
             stepActivity?.SetTag("relay.adapter.target", step.TargetType.Name);
 
-            var adapter = _serviceProvider.GetRequiredService(step.AdapterType);
-
-            var (method, resultProperty) = AdaptAsyncCache.GetOrAdd(
-                step.AdapterType,
-                static type =>
-                {
-                    var m =
-                        type.GetInterfaces()
-                            .Where(i =>
-                                i.IsGenericType
-                                && i.GetGenericTypeDefinition() == typeof(IAsyncAdapter<,>)
-                            )
-                            .SelectMany(i => i.GetMethods())
-                            .FirstOrDefault(x => x.Name == "AdaptAsync")
-                        ?? throw new InvalidOperationException(
-                            $"Adapter {type.Name} does not implement IAsyncAdapter<,> properly"
-                        );
-                    var resultProp =
-                        m.ReturnType.GetProperty("Result")
-                        ?? throw new InvalidOperationException(
-                            $"Adapter {type.Name}.AdaptAsync must return Task<T>"
-                        );
-                    return (m, resultProp);
-                }
-            );
-
-            Task task;
-            try
-            {
-                task = (Task)method.Invoke(adapter, [current, cancellationToken])!;
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException != null)
-            {
-                throw ex.InnerException;
-            }
-
-            await task.ConfigureAwait(false);
-            current = resultProperty.GetValue(task)!;
+            current =
+                step.AsyncInvoker is not null
+                    ? await step.AsyncInvoker(_serviceProvider, current, cancellationToken)
+                        .ConfigureAwait(false)
+                    : await InvokeByReflectionAsync(step, current, cancellationToken)
+                        .ConfigureAwait(false);
         }
 
         if (current is not TResult result)
@@ -106,5 +84,63 @@ public sealed class AsyncAdapterChain<TResult>(
         }
 
         return result;
+    }
+
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075:UnrecognizedReflectionPattern",
+        Justification = "Fallback only runs for chain steps built outside the Relay builders; "
+            + "builder-produced steps carry a strongly-typed invoker and never reach this path."
+    )]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2070:UnrecognizedReflectionPattern",
+        Justification = "Fallback only runs for chain steps built outside the Relay builders; "
+            + "builder-produced steps carry a strongly-typed invoker and never reach this path."
+    )]
+    private async Task<object> InvokeByReflectionAsync(
+        AdapterChainStep step,
+        object current,
+        CancellationToken cancellationToken
+    )
+    {
+        var adapter = _serviceProvider.GetRequiredService(step.AdapterType);
+
+        var (method, resultProperty) = AdaptAsyncCache.GetOrAdd(
+            step.AdapterType,
+            static type =>
+            {
+                var m =
+                    type.GetInterfaces()
+                        .Where(i =>
+                            i.IsGenericType
+                            && i.GetGenericTypeDefinition() == typeof(IAsyncAdapter<,>)
+                        )
+                        .SelectMany(i => i.GetMethods())
+                        .FirstOrDefault(x => x.Name == "AdaptAsync")
+                    ?? throw new InvalidOperationException(
+                        $"Adapter {type.Name} does not implement IAsyncAdapter<,> properly"
+                    );
+                var resultProp =
+                    m.ReturnType.GetProperty("Result")
+                    ?? throw new InvalidOperationException(
+                        $"Adapter {type.Name}.AdaptAsync must return Task<T>"
+                    );
+                return (m, resultProp);
+            }
+        );
+
+        Task task;
+        try
+        {
+            task = (Task)method.Invoke(adapter, [current, cancellationToken])!;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException != null)
+        {
+            throw ex.InnerException;
+        }
+
+        await task.ConfigureAwait(false);
+        return resultProperty.GetValue(task)!;
     }
 }

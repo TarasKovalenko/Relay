@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Relay.Builders;
 using Relay.Core.Implementations;
@@ -30,9 +31,10 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Register a single relay with lifetime configuration
     /// </summary>
-    public static RelayRegistrationBuilder<TInterface> AddRelay<TInterface, TImplementation>(
-        this IServiceCollection services
-    )
+    public static RelayRegistrationBuilder<TInterface> AddRelay<
+        TInterface,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >(this IServiceCollection services)
         where TInterface : class
         where TImplementation : class, TInterface
     {
@@ -46,7 +48,10 @@ public static class ServiceCollectionExtensions
     /// Resolve it with <c>[FromKeyedServices(key)]</c> or
     /// <c>GetRequiredKeyedService&lt;TInterface&gt;(key)</c>.
     /// </summary>
-    public static IServiceCollection AddKeyedRelay<TInterface, TImplementation>(
+    public static IServiceCollection AddKeyedRelay<
+        TInterface,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >(
         this IServiceCollection services,
         object? serviceKey,
         ServiceLifetime lifetime = ServiceLifetime.Scoped
@@ -121,9 +126,25 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddScoped<IRelayContext, DefaultRelayContext>();
-        services.AddScoped<IRelayResolver, RelayResolver>();
+        // TryAdd throughout: calling AddRelayServices twice (directly and via AddRelay) must not
+        // leave duplicate descriptors behind.
+        services.TryAddScoped<IRelayContext, DefaultRelayContext>();
+        services.TryAddScoped<IRelayResolver, RelayResolver>();
         services.TryAddScoped<IRelayContextAccessor, RelayContextAccessor>();
+        services.TryAddSingleton<IRelayScopeRunner, RelayScopeRunner>();
+        services.TryAddSingleton(TimeProvider.System);
+        return services;
+    }
+
+    /// <summary>
+    /// Register <see cref="IRelayScopeRunner"/> on its own, for applications that want the
+    /// scope helper without the rest of the relay services.
+    /// </summary>
+    public static IServiceCollection AddRelayScopeRunner(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IRelayScopeRunner, RelayScopeRunner>();
         return services;
     }
 

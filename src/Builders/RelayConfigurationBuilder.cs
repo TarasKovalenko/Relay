@@ -1,5 +1,7 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Relay.Internal;
 
 namespace Relay.Builders;
 
@@ -43,12 +45,16 @@ public sealed class RelayConfigurationBuilder
         return selector;
     }
 
+    [RequiresUnreferencedCode(
+        "Assembly scanning discovers implementation types and their interfaces through "
+            + "reflection; they cannot be statically analysed and may be removed when trimming."
+    )]
     public RelayConfigurationBuilder RegisterRelays()
     {
         foreach (var assembly in _assemblies)
         {
             var implementationTypes = assembly
-                .GetTypes()
+                .GetLoadableTypes()
                 .Where(t => t is { IsClass: true, IsAbstract: false })
                 .ToList();
 

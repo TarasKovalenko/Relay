@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Relay.Core.Interfaces;
 
 /// <summary>
@@ -47,14 +49,19 @@ public interface IAsyncAdapterChainFromBuilder<TSource, TResult>
     /// <summary>
     /// Adds an intermediate asynchronous transformation step to the chain.
     /// </summary>
-    IAsyncAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>()
+    IAsyncAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAsyncAdapter<TSource, TTarget>;
 
     /// <summary>
     /// Adds the final asynchronous transformation step to the chain.
     /// </summary>
-    IAsyncAdapterChainFinalBuilder<TResult> Finally<TAdapter>()
+    IAsyncAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAsyncAdapter<TSource, TResult>;
 }
 
@@ -67,14 +74,19 @@ public interface IAsyncAdapterChainThenBuilder<TSource, TResult>
     /// <summary>
     /// Adds another intermediate asynchronous transformation step to the chain.
     /// </summary>
-    IAsyncAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>()
+    IAsyncAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAsyncAdapter<TSource, TTarget>;
 
     /// <summary>
     /// Adds the final asynchronous transformation step to the chain.
     /// </summary>
-    IAsyncAdapterChainFinalBuilder<TResult> Finally<TAdapter>()
+    IAsyncAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAsyncAdapter<TSource, TResult>;
 }
 

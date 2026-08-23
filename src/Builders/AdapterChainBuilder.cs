@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
@@ -16,7 +17,8 @@ public sealed class AdapterChainBuilder<TResult> : IAdapterChainBuilder<TResult>
         _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
-    public IAdapterChainFromBuilder<TSource, TResult> From<TSource>() where TSource : class
+    public IAdapterChainFromBuilder<TSource, TResult> From<TSource>()
+        where TSource : class
     {
         return new AdapterChainFromBuilder<TSource, TResult>(_services);
     }
@@ -25,7 +27,8 @@ public sealed class AdapterChainBuilder<TResult> : IAdapterChainBuilder<TResult>
 /// <summary>
 /// Builder for configuring adapter chains after specifying the source
 /// </summary>
-internal sealed class AdapterChainFromBuilder<TSource, TResult> : IAdapterChainFromBuilder<TSource, TResult>
+internal sealed class AdapterChainFromBuilder<TSource, TResult>
+    : IAdapterChainFromBuilder<TSource, TResult>
     where TSource : class
 {
     private readonly IServiceCollection _services;
@@ -36,37 +39,26 @@ internal sealed class AdapterChainFromBuilder<TSource, TResult> : IAdapterChainF
         _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
-    public IAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>()
+    public IAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAdapter<TSource, TTarget>
     {
-        _steps.Add(new AdapterChainStep
-        {
-            SourceType = typeof(TSource),
-            TargetType = typeof(TTarget),
-            AdapterType = typeof(TAdapter),
-            IsFinalStep = false
-        });
-
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TTarget, TAdapter>(isFinalStep: false));
+        _services.TryAddAdapter<TAdapter>();
 
         return new AdapterChainThenBuilder<TTarget, TResult>(_services, _steps);
     }
 
-    public IAdapterChainFinalBuilder<TResult> Finally<TAdapter>()
+    public IAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TResult>
     {
-        _steps.Add(new AdapterChainStep
-        {
-            SourceType = typeof(TSource),
-            TargetType = typeof(TResult),
-            AdapterType = typeof(TAdapter),
-            IsFinalStep = true
-        });
-
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TResult, TAdapter>(isFinalStep: true));
+        _services.TryAddAdapter<TAdapter>();
 
         return new AdapterChainFinalBuilder<TResult>(_services, _steps);
     }
@@ -75,7 +67,8 @@ internal sealed class AdapterChainFromBuilder<TSource, TResult> : IAdapterChainF
 /// <summary>
 /// Builder for configuring subsequent steps in the adapter chain
 /// </summary>
-internal sealed class AdapterChainThenBuilder<TSource, TResult> : IAdapterChainThenBuilder<TSource, TResult>
+internal sealed class AdapterChainThenBuilder<TSource, TResult>
+    : IAdapterChainThenBuilder<TSource, TResult>
     where TSource : class
 {
     private readonly IServiceCollection _services;
@@ -87,37 +80,26 @@ internal sealed class AdapterChainThenBuilder<TSource, TResult> : IAdapterChainT
         _steps = steps ?? throw new ArgumentNullException(nameof(steps));
     }
 
-    public IAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>()
+    public IAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAdapter<TSource, TTarget>
     {
-        _steps.Add(new AdapterChainStep
-        {
-            SourceType = typeof(TSource),
-            TargetType = typeof(TTarget),
-            AdapterType = typeof(TAdapter),
-            IsFinalStep = false
-        });
-
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TTarget, TAdapter>(isFinalStep: false));
+        _services.TryAddAdapter<TAdapter>();
 
         return new AdapterChainThenBuilder<TTarget, TResult>(_services, _steps);
     }
 
-    public IAdapterChainFinalBuilder<TResult> Finally<TAdapter>()
+    public IAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TResult>
     {
-        _steps.Add(new AdapterChainStep
-        {
-            SourceType = typeof(TSource),
-            TargetType = typeof(TResult),
-            AdapterType = typeof(TAdapter),
-            IsFinalStep = true
-        });
-
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TResult, TAdapter>(isFinalStep: true));
+        _services.TryAddAdapter<TAdapter>();
 
         return new AdapterChainFinalBuilder<TResult>(_services, _steps);
     }
@@ -139,8 +121,9 @@ internal sealed class AdapterChainFinalBuilder<TResult> : IAdapterChainFinalBuil
 
     public void Build()
     {
-        // Register the adapter chain
-        _services.AddScoped<IAdapterChain<TResult>>(provider => 
-            new AdapterChain<TResult>(provider, _steps));
+        _services.AddScoped<IAdapterChain<TResult>>(provider => new AdapterChain<TResult>(
+            provider,
+            _steps
+        ));
     }
 }

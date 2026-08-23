@@ -1,5 +1,7 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Relay.Internal;
 
 namespace Relay.Builders;
 
@@ -25,11 +27,15 @@ public sealed class RelayTypeSelector(
         return this;
     }
 
+    [RequiresUnreferencedCode(
+        "Assembly scanning discovers implementation types through reflection; they cannot be "
+            + "statically analysed and may be removed when trimming."
+    )]
     public RelayTypeSelector ForInterface<TInterface>()
     {
         var interfaceType = typeof(TInterface);
         var implementations = _assemblies
-            .SelectMany(a => a.GetTypes())
+            .SelectMany(a => a.GetLoadableTypes())
             .Where(t => t is { IsClass: true, IsAbstract: false })
             .Where(t => interfaceType.IsAssignableFrom(t))
             .Where(_typeFilter)
@@ -67,16 +73,19 @@ public sealed class RelayTypeSelector(
         return this;
     }
 
+    [RequiresUnreferencedCode("Assembly scanning is not compatible with trimming.")]
     public RelayTypeSelector AsSingleton<TInterface>()
     {
         return WithSingletonLifetime().ForInterface<TInterface>();
     }
 
+    [RequiresUnreferencedCode("Assembly scanning is not compatible with trimming.")]
     public RelayTypeSelector AsScoped<TInterface>()
     {
         return WithScopedLifetime().ForInterface<TInterface>();
     }
 
+    [RequiresUnreferencedCode("Assembly scanning is not compatible with trimming.")]
     public RelayTypeSelector AsTransient<TInterface>()
     {
         return WithTransientLifetime().ForInterface<TInterface>();
