@@ -11,6 +11,7 @@
     <Project Path="examples/Relay.Examples.AdvancedDecorator/Relay.Examples.AdvancedDecorator.csproj" />
     <Project Path="examples/Relay.Examples.AsyncChain/Relay.Examples.AsyncChain.csproj" />
     <Project Path="examples/Relay.Examples.Basic/Relay.Examples.Basic.csproj" />
+    <Project Path="examples/Relay.Examples.CircuitBreaker/Relay.Examples.CircuitBreaker.csproj" />
     <Project Path="examples/Relay.Examples.Conditional/Relay.Examples.Conditional.csproj" />
     <Project Path="examples/Relay.Examples.ConditionalRouting/Relay.Examples.ConditionalRouting.csproj" />
     <Project Path="examples/Relay.Examples.ContextRouting/Relay.Examples.ContextRouting.csproj" />

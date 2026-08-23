@@ -20,7 +20,13 @@ public static class RelayDiagnostics
     /// </summary>
     public const string SourceName = "Relay";
 
-    private static readonly string Version =
+    /// <summary>
+    /// The name of the <see cref="System.Diagnostics.Metrics.Meter"/> emitted by Relay.
+    /// Use this string to enable metrics (e.g. <c>builder.AddMeter(RelayDiagnostics.MeterName)</c>).
+    /// </summary>
+    public const string MeterName = "Relay";
+
+    internal static readonly string Version =
         typeof(RelayDiagnostics).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
         ?? typeof(RelayDiagnostics).Assembly.GetName().Version?.ToString()
         ?? "unknown";
