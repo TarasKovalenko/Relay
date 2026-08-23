@@ -1,23 +1,27 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Relay.Decorators;
 
 namespace Relay.Builders;
 
 public sealed class RelayRegistrationBuilder<TInterface>(
     IServiceCollection services,
-    Type implementationType
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType
 )
     where TInterface : class
 {
     private readonly IServiceCollection _services =
         services ?? throw new ArgumentNullException(nameof(services));
 
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     private readonly Type _implementationType =
         implementationType ?? throw new ArgumentNullException(nameof(implementationType));
 
     private ServiceLifetime _lifetime = ServiceLifetime.Scoped;
 
-    private readonly List<Type> _decorators = [];
+    // Decorators are stored as ready-made registration steps so the decorator type stays
+    // statically known (and therefore trim-safe) at the point DecorateWith was called.
+    private readonly List<Action<IServiceCollection>> _decorators = [];
 
     public RelayRegistrationBuilder<TInterface> WithSingletonLifetime()
     {
@@ -43,10 +47,12 @@ public sealed class RelayRegistrationBuilder<TInterface>(
         return this;
     }
 
-    public RelayRegistrationBuilder<TInterface> DecorateWith<TDecorator>()
+    public RelayRegistrationBuilder<TInterface> DecorateWith<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDecorator
+    >()
         where TDecorator : class, TInterface
     {
-        _decorators.Add(typeof(TDecorator));
+        _decorators.Add(static services => services.Decorate<TInterface, TDecorator>());
         return this;
     }
 
@@ -56,9 +62,9 @@ public sealed class RelayRegistrationBuilder<TInterface>(
         _services.Add(descriptor);
 
         // Apply decorators
-        foreach (var decoratorType in _decorators)
+        foreach (var decorate in _decorators)
         {
-            _services.Decorate<TInterface>(decoratorType);
+            decorate(_services);
         }
 
         return _services;

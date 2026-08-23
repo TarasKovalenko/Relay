@@ -17,6 +17,7 @@
     <Project Path="examples/Relay.Examples.DecorateWith/Relay.Examples.DecorateWith.csproj" />
     <Project Path="examples/Relay.Examples.Factory/Relay.Examples.Factory.csproj" />
     <Project Path="examples/Relay.Examples.Integration/Relay.Examples.Integration.csproj" />
+    <Project Path="examples/Relay.Examples.LifetimeSafety/Relay.Examples.LifetimeSafety.csproj" />
     <Project Path="examples/Relay.Examples.MultiBroadcasting/Relay.Examples.MultiBroadcasting.csproj" />
     <Project Path="examples/Relay.Examples.MultiFailover/Relay.Examples.MultiFailover.csproj" />
     <Project Path="examples/Relay.Examples.Observability/Relay.Examples.Observability.csproj" />
