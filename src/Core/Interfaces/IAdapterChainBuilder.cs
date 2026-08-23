@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Relay.Core.Interfaces;
 
 /// <summary>
@@ -20,14 +22,19 @@ public interface IAdapterChainFromBuilder<TSource, TResult>
     /// <summary>
     /// Adds an intermediate transformation step to the chain
     /// </summary>
-    IAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>() 
+    IAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAdapter<TSource, TTarget>;
 
     /// <summary>
     /// Adds the final transformation step to the chain
     /// </summary>
-    IAdapterChainFinalBuilder<TResult> Finally<TAdapter>() 
+    IAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TResult>;
 }
 
@@ -40,14 +47,19 @@ public interface IAdapterChainThenBuilder<TSource, TResult>
     /// <summary>
     /// Adds another intermediate transformation step to the chain
     /// </summary>
-    IAdapterChainThenBuilder<TTarget, TResult> Then<TTarget, TAdapter>() 
+    IAdapterChainThenBuilder<TTarget, TResult> Then<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget : class
         where TAdapter : class, IAdapter<TSource, TTarget>;
 
     /// <summary>
     /// Adds the final transformation step to the chain
     /// </summary>
-    IAdapterChainFinalBuilder<TResult> Finally<TAdapter>() 
+    IAdapterChainFinalBuilder<TResult> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TResult>;
 }
 
@@ -72,14 +84,19 @@ public interface ITypedAdapterChainBuilder<TSource, TTarget>
     /// <summary>
     /// Adds an intermediate transformation step to the chain
     /// </summary>
-    ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<TIntermediate, TAdapter>() 
+    ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<
+        TIntermediate,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TIntermediate : class
         where TAdapter : class, IAdapter<TSource, TIntermediate>;
 
     /// <summary>
     /// Adds the final transformation step to the chain (TSource -> TTarget)
     /// </summary>
-    ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<TAdapter>() 
+    ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TTarget>;
 }
 
@@ -93,14 +110,19 @@ public interface ITypedAdapterChainThenBuilder<TSource, TTarget>
     /// <summary>
     /// Adds another intermediate transformation step to the chain
     /// </summary>
-    ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<TIntermediate, TAdapter>() 
+    ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<
+        TIntermediate,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TIntermediate : class
         where TAdapter : class, IAdapter<TSource, TIntermediate>;
 
     /// <summary>
     /// Adds the final transformation step to the chain
     /// </summary>
-    ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<TAdapter>() 
+    ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TTarget>;
 }
 

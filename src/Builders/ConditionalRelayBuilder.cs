@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
 
@@ -44,7 +45,9 @@ public sealed class ConditionalRelayBuilder<TInterface>(IServiceCollection servi
         return new ConditionalRelayStep<TInterface>(this, condition);
     }
 
-    public ConditionalRelayBuilder<TInterface> Otherwise<TImplementation>()
+    public ConditionalRelayBuilder<TInterface> Otherwise<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >()
         where TImplementation : class, TInterface
     {
         return When(_ => true).RelayTo<TImplementation>();
@@ -72,7 +75,7 @@ public sealed class ConditionalRelayBuilder<TInterface>(IServiceCollection servi
                         );
                     }
                     var implementationType =
-                        registration.ImplementationType ?? registration.TypeSelector!(context);
+                        registration.ImplementationType ?? ResolveSelectedType(registration, context);
                     // Reuse an existing DI registration (and its lifetime) when the implementation
                     // is registered; otherwise create it with its constructor dependencies resolved.
                     var instance =
@@ -91,6 +94,18 @@ public sealed class ConditionalRelayBuilder<TInterface>(IServiceCollection servi
     {
         _registrations.Add(registration);
     }
+
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2073:UnrecognizedReflectionPattern",
+        Justification = "Only reached for the RelayTo(Func<IRelayContext, Type>) overload, which "
+            + "is annotated with RequiresUnreferencedCode."
+    )]
+    [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+    private static Type ResolveSelectedType(
+        ConditionalRelayRegistration registration,
+        IRelayContext context
+    ) => registration.TypeSelector!(context);
 }
 
 public sealed class ConditionalRelayStep<TInterface>(
@@ -105,7 +120,9 @@ public sealed class ConditionalRelayStep<TInterface>(
     private readonly Func<IRelayContext, bool> _condition =
         condition ?? throw new ArgumentNullException(nameof(condition));
 
-    public ConditionalRelayBuilder<TInterface> RelayTo<TImplementation>()
+    public ConditionalRelayBuilder<TInterface> RelayTo<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >()
         where TImplementation : class, TInterface
     {
         _parent.AddRegistration(
@@ -118,6 +135,10 @@ public sealed class ConditionalRelayStep<TInterface>(
         return _parent;
     }
 
+    [RequiresUnreferencedCode(
+        "The selected implementation type is only known at runtime and cannot be statically "
+            + "analysed; it may be removed when trimming."
+    )]
     public ConditionalRelayBuilder<TInterface> RelayTo(Func<IRelayContext, Type> typeSelector)
     {
         ArgumentNullException.ThrowIfNull(typeSelector);
@@ -132,6 +153,9 @@ public sealed class ConditionalRelayStep<TInterface>(
 internal sealed class ConditionalRelayRegistration
 {
     public Func<IRelayContext, bool> Condition { get; set; } = null!;
+
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     public Type? ImplementationType { get; set; }
+
     public Func<IRelayContext, Type>? TypeSelector { get; set; }
 }

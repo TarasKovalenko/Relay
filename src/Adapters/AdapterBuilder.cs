@@ -1,11 +1,15 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Relay.Adapters;
 
 /// <summary>
 /// Builder for configuring adapter registration with fluent API
 /// </summary>
-public sealed class AdapterBuilder<TTarget, TAdaptee>
+public sealed class AdapterBuilder<
+    TTarget,
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdaptee
+>
     where TTarget : class
     where TAdaptee : class
 {
@@ -66,7 +70,9 @@ public sealed class AdapterBuilder<TTarget, TAdaptee>
     /// <summary>
     /// Use a specific adapter class that implements TTarget and wraps TAdaptee
     /// </summary>
-    public IServiceCollection Using<TAdapter>()
+    public IServiceCollection Using<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, TTarget
     {
         // Register adaptee

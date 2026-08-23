@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Relay.Internal;
 
 namespace Relay.Adapters;
 
@@ -11,9 +13,10 @@ public static class AdapterRegistrationExtensions
     /// <summary>
     /// Register an adapter that wraps an incompatible service (Adaptee) to implement the target interface
     /// </summary>
-    public static AdapterBuilder<TTarget, TAdaptee> AddAdapter<TTarget, TAdaptee>(
-        this IServiceCollection services
-    )
+    public static AdapterBuilder<TTarget, TAdaptee> AddAdapter<
+        TTarget,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdaptee
+    >(this IServiceCollection services)
         where TTarget : class
         where TAdaptee : class
     {
@@ -24,6 +27,10 @@ public static class AdapterRegistrationExtensions
     /// <summary>
     /// Register multiple adapters from assembly scanning based on naming conventions
     /// </summary>
+    [RequiresUnreferencedCode(
+        "Assembly scanning discovers adapter types through reflection; the types it registers "
+            + "cannot be statically analysed and may be removed when trimming."
+    )]
     public static IServiceCollection AddAdaptersFromAssembly<TTargetInterface>(
         this IServiceCollection services,
         ServiceLifetime lifetime = ServiceLifetime.Scoped,
@@ -40,7 +47,7 @@ public static class AdapterRegistrationExtensions
         foreach (var assembly in assembliesToScan)
         {
             var adapterTypes = assembly
-                .GetTypes()
+                .GetLoadableTypes()
                 .Where(t =>
                     t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false }
                 )
@@ -57,6 +64,9 @@ public static class AdapterRegistrationExtensions
         return services;
     }
 
+    [RequiresUnreferencedCode(
+        "Constructor dependencies are discovered through reflection during assembly scanning."
+    )]
     private static void RegisterAdapterWithDependencies(
         IServiceCollection services,
         Type targetInterface,

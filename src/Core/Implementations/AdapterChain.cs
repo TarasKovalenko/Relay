@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Interfaces;
@@ -15,6 +16,21 @@ public sealed class AdapterChainStep
     public Type TargetType { get; init; } = null!;
     public Type AdapterType { get; init; } = null!;
     public bool IsFinalStep { get; init; }
+
+    /// <summary>
+    /// Strongly-typed invoker supplied by the builders. When present the chain runs without
+    /// reflection (and stays trim/AOT friendly).
+    /// </summary>
+    internal Func<IServiceProvider, object, object>? Invoker { get; init; }
+
+    /// <summary>
+    /// Strongly-typed asynchronous invoker supplied by the builders.
+    /// </summary>
+    internal Func<IServiceProvider, object, CancellationToken, Task<object>>? AsyncInvoker
+    {
+        get;
+        init;
+    }
 }
 
 /// <summary>
@@ -30,7 +46,8 @@ public sealed class AdapterChain<TResult>(
     private readonly List<AdapterChainStep> _steps =
         steps ?? throw new ArgumentNullException(nameof(steps));
 
-    // Cache the resolved Adapt MethodInfo per adapter type to avoid reflection on every execution.
+    // Cache the resolved Adapt MethodInfo per adapter type. Only used by the reflection
+    // fallback for steps that were constructed without a strongly-typed invoker.
     private static readonly ConcurrentDictionary<Type, MethodInfo> AdaptMethodCache = new();
 
     public TResult Execute<TSource>(TSource? source)
@@ -73,7 +90,9 @@ public sealed class AdapterChain<TResult>(
             );
         }
 
-        using var chainActivity = RelayDiagnostics.ActivitySource.StartActivity("AdapterChain.Execute");
+        using var chainActivity = RelayDiagnostics.ActivitySource.StartActivity(
+            "AdapterChain.Execute"
+        );
         chainActivity?.SetTag("relay.chain.result_type", typeof(TResult).Name);
         chainActivity?.SetTag("relay.chain.source_type", firstStep.SourceType.Name);
         chainActivity?.SetTag("relay.chain.steps", _steps.Count);
@@ -81,36 +100,16 @@ public sealed class AdapterChain<TResult>(
         // Execute each step in the chain
         foreach (var step in _steps)
         {
-            using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity("AdapterChain.Step");
+            using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity(
+                "AdapterChain.Step"
+            );
             stepActivity?.SetTag("relay.adapter", step.AdapterType.Name);
             stepActivity?.SetTag("relay.adapter.target", step.TargetType.Name);
 
-            var adapter = _serviceProvider.GetRequiredService(step.AdapterType);
-
-            // Resolve the Adapt method once per adapter type, then reuse the cached MethodInfo.
-            var adaptMethod = AdaptMethodCache.GetOrAdd(
-                step.AdapterType,
-                static type =>
-                    type.GetInterfaces()
-                        .Where(i =>
-                            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAdapter<,>)
-                        )
-                        .SelectMany(i => i.GetMethods())
-                        .FirstOrDefault(m => m.Name == "Adapt")
-                    ?? throw new InvalidOperationException(
-                        $"Adapter {type.Name} does not implement IAdapter<,> properly"
-                    )
-            );
-
-            try
-            {
-                current = adaptMethod.Invoke(adapter, [current])!;
-            }
-            catch (TargetInvocationException ex) when (ex.InnerException != null)
-            {
-                // Unwrap and re-throw the inner exception to preserve original stack trace
-                throw ex.InnerException;
-            }
+            current =
+                step.Invoker is not null
+                    ? step.Invoker(_serviceProvider, current)
+                    : InvokeByReflection(step, current);
         }
 
         if (current is not TResult result)
@@ -121,6 +120,40 @@ public sealed class AdapterChain<TResult>(
         }
 
         return result;
+    }
+
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2070:UnrecognizedReflectionPattern",
+        Justification = "Fallback only runs for chain steps built outside the Relay builders; "
+            + "builder-produced steps carry a strongly-typed invoker and never reach this path."
+    )]
+    private object InvokeByReflection(AdapterChainStep step, object current)
+    {
+        var adapter = _serviceProvider.GetRequiredService(step.AdapterType);
+
+        // Resolve the Adapt method once per adapter type, then reuse the cached MethodInfo.
+        var adaptMethod = AdaptMethodCache.GetOrAdd(
+            step.AdapterType,
+            static type =>
+                type.GetInterfaces()
+                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAdapter<,>))
+                    .SelectMany(i => i.GetMethods())
+                    .FirstOrDefault(m => m.Name == "Adapt")
+                ?? throw new InvalidOperationException(
+                    $"Adapter {type.Name} does not implement IAdapter<,> properly"
+                )
+        );
+
+        try
+        {
+            return adaptMethod.Invoke(adapter, [current])!;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException != null)
+        {
+            // Unwrap and re-throw the inner exception to preserve original stack trace
+            throw ex.InnerException;
+        }
     }
 }
 

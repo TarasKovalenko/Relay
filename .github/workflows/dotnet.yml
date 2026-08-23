@@ -1,4 +1,4 @@
-# This workflow will build a .NET project
+# Build, test and pack Relay on every push to main and every pull request.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
 name: .NET
@@ -9,20 +9,46 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      CI: true
+      DOTNET_NOLOGO: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 10.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore dependencies
+        run: dotnet restore Relay.slnx
+
+      - name: Build
+        run: dotnet build Relay.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Relay.slnx -c Release --no-build --collect:"XPlat Code Coverage" --results-directory artifacts/test-results
+
+      # Packing on every build catches metadata and packaging breaks before a release tag does.
+      - name: Pack
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet pack src/Relay.csproj -c Release --no-build
+
+      - name: Upload packages
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages/*.*nupkg

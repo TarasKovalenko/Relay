@@ -128,7 +128,7 @@ public class TypedAdapterChainBuilderTests
     }
 
     [Fact]
-    public void TypedAdapterChainThenBuilder_Then_Final_ShouldReturnFinalBuilderProxy()
+    public void TypedAdapterChainThenBuilder_Then_Final_ShouldReturnFinalBuilder()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -140,9 +140,7 @@ public class TypedAdapterChainBuilderTests
 
         // Assert
         finalBuilder.ShouldNotBeNull();
-        finalBuilder.ShouldBeOfType<
-            TypedAdapterChainFinalBuilderProxy<IntermediateData, FinalData>
-        >();
+        finalBuilder.ShouldBeOfType<TypedAdapterChainFinalBuilder<IntermediateData, FinalData>>();
 
         // Verify both adapters are registered
         var serviceProvider = services.BuildServiceProvider();

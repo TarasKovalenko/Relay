@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
@@ -20,52 +21,42 @@ public sealed class TypedAdapterChainBuilder<TSource, TTarget>
         _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
-    public ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<TIntermediate, TAdapter>()
+    public ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<
+        TIntermediate,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TIntermediate : class
         where TAdapter : class, IAdapter<TSource, TIntermediate>
     {
         _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TIntermediate),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = false,
-            }
+            AdapterChainStepFactory.Create<TSource, TIntermediate, TAdapter>(isFinalStep: false)
         );
+        _services.TryAddAdapter<TAdapter>();
 
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
-
+        // The registration closure is created here, where the original source type is still
+        // statically known, so no MakeGenericType/Activator reflection is needed later on.
         return new TypedAdapterChainThenBuilder<TIntermediate, TTarget>(
             _services,
             _steps,
-            typeof(TSource),
-            typeof(TTarget)
+            Register
         );
     }
 
-    public ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<TAdapter>()
+    public ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TTarget>
     {
-        _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TTarget),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = true,
-            }
-        );
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TTarget, TAdapter>(isFinalStep: true));
+        _services.TryAddAdapter<TAdapter>();
 
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        return new TypedAdapterChainFinalBuilder<TSource, TTarget>(_steps, Register);
+    }
 
-        return new TypedAdapterChainFinalBuilder<TSource, TTarget>(
-            _services,
-            _steps,
-            typeof(TSource),
-            typeof(TTarget)
+    private void Register(List<AdapterChainStep> steps)
+    {
+        _services.AddScoped<ITypedAdapterChain<TSource, TTarget>>(provider =>
+            new TypedAdapterChain<TSource, TTarget>(new AdapterChain<TTarget>(provider, steps))
         );
     }
 }
@@ -73,182 +64,71 @@ public sealed class TypedAdapterChainBuilder<TSource, TTarget>
 /// <summary>
 /// Builder for subsequent steps in typed adapter chains
 /// </summary>
-internal sealed class TypedAdapterChainThenBuilder<TSource, TTarget>
-    : ITypedAdapterChainThenBuilder<TSource, TTarget>
+internal sealed class TypedAdapterChainThenBuilder<TSource, TTarget>(
+    IServiceCollection services,
+    List<AdapterChainStep> steps,
+    Action<List<AdapterChainStep>> register
+) : ITypedAdapterChainThenBuilder<TSource, TTarget>
     where TSource : class
     where TTarget : class
 {
-    private readonly IServiceCollection _services;
-    private readonly List<AdapterChainStep> _steps;
-    private readonly Type _originalSourceType;
-    private readonly Type _finalTargetType;
+    private readonly IServiceCollection _services =
+        services ?? throw new ArgumentNullException(nameof(services));
 
-    internal TypedAdapterChainThenBuilder(
-        IServiceCollection services,
-        List<AdapterChainStep> steps,
-        Type originalSourceType,
-        Type finalTargetType
-    )
-    {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
-        _steps = steps ?? throw new ArgumentNullException(nameof(steps));
-        _originalSourceType =
-            originalSourceType ?? throw new ArgumentNullException(nameof(originalSourceType));
-        _finalTargetType =
-            finalTargetType ?? throw new ArgumentNullException(nameof(finalTargetType));
-    }
+    private readonly List<AdapterChainStep> _steps =
+        steps ?? throw new ArgumentNullException(nameof(steps));
 
-    public ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<TIntermediate, TAdapter>()
+    private readonly Action<List<AdapterChainStep>> _register =
+        register ?? throw new ArgumentNullException(nameof(register));
+
+    public ITypedAdapterChainThenBuilder<TIntermediate, TTarget> Then<
+        TIntermediate,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TIntermediate : class
         where TAdapter : class, IAdapter<TSource, TIntermediate>
     {
         _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TIntermediate),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = false,
-            }
+            AdapterChainStepFactory.Create<TSource, TIntermediate, TAdapter>(isFinalStep: false)
         );
-
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
+        _services.TryAddAdapter<TAdapter>();
 
         return new TypedAdapterChainThenBuilder<TIntermediate, TTarget>(
             _services,
             _steps,
-            _originalSourceType,
-            _finalTargetType
+            _register
         );
     }
 
-    public ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<TAdapter>()
+    public ITypedAdapterChainFinalBuilder<TSource, TTarget> Then<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TTarget>
     {
-        _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TTarget),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = true,
-            }
-        );
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TTarget, TAdapter>(isFinalStep: true));
+        _services.TryAddAdapter<TAdapter>();
 
-        // Register the adapter
-        _services.AddScoped<TAdapter>();
-
-        // Create a final builder that will register with the original types
-        return new TypedAdapterChainFinalBuilderProxy<TSource, TTarget>(
-            _services,
-            _steps,
-            _originalSourceType,
-            _finalTargetType
-        );
+        // Registration always targets the ORIGINAL source type captured by _register,
+        // not the current intermediate type.
+        return new TypedAdapterChainFinalBuilder<TSource, TTarget>(_steps, _register);
     }
 }
 
 /// <summary>
-/// Final builder for completing the typed adapter chain configuration with original source types
+/// Final builder for completing the typed adapter chain configuration
 /// </summary>
-internal sealed class TypedAdapterChainFinalBuilder<TSource, TTarget>
-    : ITypedAdapterChainFinalBuilder<TSource, TTarget>
+internal sealed class TypedAdapterChainFinalBuilder<TSource, TTarget>(
+    List<AdapterChainStep> steps,
+    Action<List<AdapterChainStep>> register
+) : ITypedAdapterChainFinalBuilder<TSource, TTarget>
     where TSource : class
     where TTarget : class
 {
-    private readonly IServiceCollection _services;
-    private readonly List<AdapterChainStep> _steps;
-    private readonly Type _originalSourceType;
-    private readonly Type _finalTargetType;
+    private readonly List<AdapterChainStep> _steps =
+        steps ?? throw new ArgumentNullException(nameof(steps));
 
-    internal TypedAdapterChainFinalBuilder(
-        IServiceCollection services,
-        List<AdapterChainStep> steps,
-        Type originalSourceType,
-        Type finalTargetType
-    )
-    {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
-        _steps = steps ?? throw new ArgumentNullException(nameof(steps));
-        _originalSourceType =
-            originalSourceType ?? throw new ArgumentNullException(nameof(originalSourceType));
-        _finalTargetType =
-            finalTargetType ?? throw new ArgumentNullException(nameof(finalTargetType));
-    }
+    private readonly Action<List<AdapterChainStep>> _register =
+        register ?? throw new ArgumentNullException(nameof(register));
 
-    public void Build()
-    {
-        // Register with the original source and final target types
-        var serviceType = typeof(ITypedAdapterChain<,>).MakeGenericType(
-            _originalSourceType,
-            _finalTargetType
-        );
-        var implementationType = typeof(TypedAdapterChain<,>).MakeGenericType(
-            _originalSourceType,
-            _finalTargetType
-        );
-
-        _services.AddScoped(
-            serviceType,
-            provider =>
-            {
-                var innerChainType = typeof(AdapterChain<>).MakeGenericType(_finalTargetType);
-                var innerChain = Activator.CreateInstance(innerChainType, provider, _steps);
-                return Activator.CreateInstance(implementationType, innerChain)!;
-            }
-        );
-    }
-}
-
-/// <summary>
-/// Proxy final builder that registers with the original source type instead of intermediate type
-/// </summary>
-internal sealed class TypedAdapterChainFinalBuilderProxy<TCurrentSource, TTarget>
-    : ITypedAdapterChainFinalBuilder<TCurrentSource, TTarget>
-    where TCurrentSource : class
-    where TTarget : class
-{
-    private readonly IServiceCollection _services;
-    private readonly List<AdapterChainStep> _steps;
-    private readonly Type _originalSourceType;
-    private readonly Type _finalTargetType;
-
-    internal TypedAdapterChainFinalBuilderProxy(
-        IServiceCollection services,
-        List<AdapterChainStep> steps,
-        Type originalSourceType,
-        Type finalTargetType
-    )
-    {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
-        _steps = steps ?? throw new ArgumentNullException(nameof(steps));
-        _originalSourceType =
-            originalSourceType ?? throw new ArgumentNullException(nameof(originalSourceType));
-        _finalTargetType =
-            finalTargetType ?? throw new ArgumentNullException(nameof(finalTargetType));
-    }
-
-    public void Build()
-    {
-        // Register with the ORIGINAL source type and final target type, not the current intermediate types
-        var serviceType = typeof(ITypedAdapterChain<,>).MakeGenericType(
-            _originalSourceType,
-            _finalTargetType
-        );
-        var implementationType = typeof(TypedAdapterChain<,>).MakeGenericType(
-            _originalSourceType,
-            _finalTargetType
-        );
-
-        _services.AddScoped(
-            serviceType,
-            provider =>
-            {
-                var innerChainType = typeof(AdapterChain<>).MakeGenericType(_finalTargetType);
-                var innerChain = Activator.CreateInstance(innerChainType, provider, _steps);
-                return Activator.CreateInstance(implementationType, innerChain)!;
-            }
-        );
-    }
+    public void Build() => _register(_steps);
 }

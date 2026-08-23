@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
@@ -94,7 +95,14 @@ public sealed class NamedAdapterChainSource<TTarget>(
     public NamedAdapterChainBuilder<TSource, TTarget> From<TSource>()
         where TSource : class
     {
-        return new NamedAdapterChainBuilder<TSource, TTarget>(factory, name, typeof(TSource), []);
+        // Capture the source resolver while TSource is statically known so the chain never
+        // has to resolve it by Type at runtime.
+        return new NamedAdapterChainBuilder<TSource, TTarget>(
+            factory,
+            name,
+            static provider => provider.GetRequiredService<TSource>(),
+            []
+        );
     }
 }
 
@@ -107,43 +115,40 @@ public sealed class NamedAdapterChainBuilder<TSource, TTarget>
 {
     private readonly AdapterChainFactoryBuilder<TTarget> _factory;
     private readonly string _name;
-    private readonly Type _originSourceType;
+    private readonly Func<IServiceProvider, object> _sourceResolver;
     private readonly List<AdapterChainStep> _steps;
 
     internal NamedAdapterChainBuilder(
         AdapterChainFactoryBuilder<TTarget> factory,
         string name,
-        Type originSourceType,
+        Func<IServiceProvider, object> sourceResolver,
         List<AdapterChainStep> steps
     )
     {
         _factory = factory;
         _name = name;
-        _originSourceType = originSourceType;
+        _sourceResolver = sourceResolver;
         _steps = steps;
     }
 
     /// <summary>
     /// Adds an intermediate transformation step to the chain.
     /// </summary>
-    public NamedAdapterChainBuilder<TTarget1, TTarget> Then<TTarget1, TAdapter>()
+    public NamedAdapterChainBuilder<TTarget1, TTarget> Then<
+        TTarget1,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TTarget1 : class
         where TAdapter : class, IAdapter<TSource, TTarget1>
     {
         _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TTarget1),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = false,
-            }
+            AdapterChainStepFactory.Create<TSource, TTarget1, TAdapter>(isFinalStep: false)
         );
-        _factory.Services.AddScoped<TAdapter>();
+        _factory.Services.TryAddAdapter<TAdapter>();
         return new NamedAdapterChainBuilder<TTarget1, TTarget>(
             _factory,
             _name,
-            _originSourceType,
+            _sourceResolver,
             _steps
         );
     }
@@ -152,29 +157,20 @@ public sealed class NamedAdapterChainBuilder<TSource, TTarget>
     /// Adds the final transformation step (to <typeparamref name="TTarget"/>) and registers
     /// the named chain with the factory.
     /// </summary>
-    public AdapterChainFactoryBuilder<TTarget> Finally<TAdapter>()
+    public AdapterChainFactoryBuilder<TTarget> Finally<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TAdapter
+    >()
         where TAdapter : class, IAdapter<TSource, TTarget>
     {
-        _steps.Add(
-            new AdapterChainStep
-            {
-                SourceType = typeof(TSource),
-                TargetType = typeof(TTarget),
-                AdapterType = typeof(TAdapter),
-                IsFinalStep = true,
-            }
-        );
-        _factory.Services.AddScoped<TAdapter>();
+        _steps.Add(AdapterChainStepFactory.Create<TSource, TTarget, TAdapter>(isFinalStep: true));
+        _factory.Services.TryAddAdapter<TAdapter>();
 
         var steps = _steps;
-        var originType = _originSourceType;
+        var resolveSource = _sourceResolver;
         _factory.AddChainProducer(
             _name,
             provider =>
-            {
-                var source = provider.GetRequiredService(originType);
-                return new AdapterChain<TTarget>(provider, steps).ExecuteCore(source);
-            }
+                new AdapterChain<TTarget>(provider, steps).ExecuteCore(resolveSource(provider))
         );
 
         return _factory;

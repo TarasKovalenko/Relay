@@ -32,7 +32,10 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 - **🛡️ Resilience**: Failover with per-relay retry and exponential backoff
 - **⏱️ Async Pipelines**: `IAsyncAdapter` chains for non-blocking I/O transformations
 - **🔭 Observability**: Built-in `ActivitySource` tracing for chains and multi-relays
-- **⚡ Performance Optimized**: Cached reflection and lock-free round-robin resolution
+- **🩺 Container Validation**: Catch captive dependencies and missing registrations before startup
+- **💤 Lazy & Scoped Helpers**: `Lazy<T>` resolution and scope-per-unit-of-work for singletons
+- **🎁 Decorators**: Wrap any registration, keyed services included
+- **⚡ Performance Optimized**: Reflection-free adapter chains, trim/AOT compatible, lock-free round-robin
 
 ## 🚀 **Quick Start**
 
@@ -274,6 +277,81 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(t => t.AddSource(RelayDiagnostics.SourceName));
 ```
 
+### **13. Container Validation**
+Static analysis of your `IServiceCollection` that runs *before* the provider is built. It reports
+captive dependencies, missing registrations, captured disposable transients and duplicates — all of
+them at once, with a message that names the offending type.
+```csharp
+using Relay.Validation;
+
+var result = services.ValidateRelayRegistrations();
+if (!result.IsValid)
+{
+    logger.LogError("{Issues}", result); // every issue, one per line
+}
+
+// ...or fail fast during startup
+services.ValidateRelayRegistrationsOrThrow();
+
+// Tune what is checked
+services.ValidateRelayRegistrationsOrThrow(new RelayValidationOptions
+{
+    CheckDuplicateRegistrations = true,
+    IgnoredServiceTypes = [typeof(ILegacyThing)],
+});
+```
+Sample output:
+```text
+1 dependency injection issue(s) found:
+ - [Error] CaptiveDependency: Singleton ReportScheduler (registered as ReportScheduler) captures
+   scoped IUnitOfWork. The scoped instance would live for the lifetime of the application.
+   Inject IRelayScopeRunner (or IServiceScopeFactory) and create a scope per unit of work instead.
+```
+This complements `ValidateOnBuild`/`ValidateScopes`: those only fail when something is resolved,
+this one reads the descriptors.
+
+### **14. Scoped Work From Singletons**
+The fix for "Cannot consume scoped service from singleton". Registered by `AddRelayServices()`.
+```csharp
+public sealed class ReportScheduler(IRelayScopeRunner scopeRunner) // singleton
+{
+    public Task RunAsync(CancellationToken ct) =>
+        scopeRunner.RunAsync<IUnitOfWork>((unitOfWork, token) => unitOfWork.FlushAsync(token), ct);
+}
+```
+`Run`, `Run<TService, TResult>`, `RunAsync` and an `IServiceProvider` overload are available; the
+scope (and everything it created) is disposed when the delegate returns.
+
+### **15. Lazy Resolution**
+Defer construction of an expensive service, or break a constructor cycle, without a service locator.
+```csharp
+services.AddLazyResolution();          // enables Lazy<T> for every registered service
+services.AddLazyResolution<IReportRenderer>(); // ...or just one
+
+public sealed class Checkout(Lazy<IReportRenderer> renderer)
+{
+    public string Receipt() => renderer.Value.Render(); // constructed on first use
+}
+```
+
+### **16. Decorators**
+```csharp
+services.AddScoped<IPaymentService, StripeRelay>();
+
+services.Decorate<IPaymentService, LoggingPaymentDecorator>();   // wraps every registration
+services.Decorate<IPaymentService>((inner, sp) => new RetryDecorator(inner)); // factory form
+services.TryDecorate<IPaymentService, MetricsDecorator>();       // false instead of throwing
+services.DecorateKeyed<IPaymentService, AuditDecorator>("stripe"); // keyed registrations
+```
+Decorators stack in the order they are applied and preserve the original lifetime.
+
+### **17. Trimming & Native AOT**
+The package is marked `IsAotCompatible` and ships with trim annotations. Adapter chains build
+strongly-typed invokers at registration time, so executing a chain performs **no reflection at all**.
+The assembly-scanning entry points (`RegisterRelays`, `ForInterface<T>`, `AddAdaptersFromAssembly<T>`,
+and `RelayTo(Func<IRelayContext, Type>)`) are annotated `[RequiresUnreferencedCode]` — they still
+work in a normal build, and the analyzer tells you if you use them in a trimmed one.
+
 ## 🎯 **Real-World Use Cases**
 
 ### **1. Multi-Environment Deployments**
@@ -314,9 +392,9 @@ builder.Services.AddOpenTelemetry()
 - Feature flag support
 
 ### **✅ Performance Optimized**
-- Efficient service resolution
-- Proper lifetime management
-- Minimal overhead
+- Reflection-free adapter chain execution
+- Trimming and native AOT compatible
+- Proper lifetime management, verified by container validation
 
 ### **✅ Enterprise Ready**
 - Thread-safe operations
@@ -346,7 +424,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="1.2.0" />
+<PackageReference Include="Relay" Version="2.0.0" />
 ```
 
 ### **Basic Setup**
@@ -375,6 +453,7 @@ ones worth starting with:
 - **Observability** — tracing an adapter chain via `ActivitySource` / OpenTelemetry
 - **ContextRouting** — multi-tenant routing that picks an implementation per request from `IRelayContext`
 - **AsyncChain** — non-blocking I/O transformation pipeline
+- **LifetimeSafety** — captive dependency detection, `Lazy<T>` resolution and scope-per-run
 
 The [`tests/`](tests) project doubles as executable documentation of the full API.
 
