@@ -19,6 +19,8 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
 
     private RelayResilienceOptions _resilience = RelayResilienceOptions.None;
 
+    private RelayCircuitBreakerOptions _circuitBreaker = RelayCircuitBreakerOptions.Disabled;
+
     private ServiceLifetime _lifetime = ServiceLifetime.Scoped;
 
     public MultiRelayBuilder<TInterface> AddRelay<
@@ -98,6 +100,44 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
         return this;
     }
 
+    /// <summary>
+    /// Stop calling a relay that keeps failing. After <paramref name="failureThreshold"/>
+    /// consecutive failures the relay is skipped for <paramref name="breakDuration"/>, then gets a
+    /// single trial call before it is trusted again. Applies to the
+    /// <see cref="RelayStrategy.Failover"/> and <see cref="RelayStrategy.FirstSuccessful"/>
+    /// strategies, and composes with <see cref="WithRetry"/>: the retries happen first, and only
+    /// then does the relay count as failed.
+    /// </summary>
+    public MultiRelayBuilder<TInterface> WithCircuitBreaker(
+        int failureThreshold = 3,
+        TimeSpan? breakDuration = null
+    )
+    {
+        if (failureThreshold < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(failureThreshold),
+                "failureThreshold must be at least 1"
+            );
+        }
+
+        var duration = breakDuration ?? TimeSpan.FromSeconds(30);
+        if (duration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(breakDuration),
+                "breakDuration must be greater than zero"
+            );
+        }
+
+        _circuitBreaker = new RelayCircuitBreakerOptions
+        {
+            FailureThreshold = failureThreshold,
+            BreakDuration = duration,
+        };
+        return this;
+    }
+
     public IServiceCollection Build()
     {
         // Materialize each relay registration with its explicit lifetime, or the final default.
@@ -125,7 +165,13 @@ public sealed class MultiRelayBuilder<TInterface>(IServiceCollection services)
 
                     // Honour a registered TimeProvider so retry backoff is testable.
                     var timeProvider = provider.GetService<TimeProvider>() ?? TimeProvider.System;
-                    return new MultiRelay<TInterface>(relays, _strategy, _resilience, timeProvider);
+                    return new MultiRelay<TInterface>(
+                        relays,
+                        _strategy,
+                        _resilience,
+                        _circuitBreaker,
+                        timeProvider
+                    );
                 },
                 _lifetime
             )

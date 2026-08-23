@@ -29,9 +29,9 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 - **🔗 True Adapter Pattern**: Seamlessly integrate legacy systems and incompatible interfaces
 - **⛓️ Adapter Chains**: Build complex transformation pipelines (A→B→C→X)
 - **🏭 Relay Factories**: Key-based service creation with native keyed-DI support
-- **🛡️ Resilience**: Failover with per-relay retry and exponential backoff
+- **🛡️ Resilience**: Failover with per-relay retry, exponential backoff and circuit breaking
 - **⏱️ Async Pipelines**: `IAsyncAdapter` chains for non-blocking I/O transformations
-- **🔭 Observability**: Built-in `ActivitySource` tracing for chains and multi-relays
+- **🔭 Observability**: Built-in `ActivitySource` tracing **and** `Meter` metrics for chains and multi-relays
 - **🩺 Container Validation**: Catch captive dependencies and missing registrations before startup
 - **💤 Lazy & Scoped Helpers**: `Lazy<T>` resolution and scope-per-unit-of-work for singletons
 - **🎁 Decorators**: Wrap any registration, keyed services included
@@ -270,12 +270,25 @@ public class CheckoutController([FromKeyedServices("paypal")] IPaymentService pa
 ```
 
 ### **12. Built-in Observability**
-Adapter chains and multi-relays emit `System.Diagnostics.Activity` traces from an `ActivitySource` named `Relay`. Activities are only created when a listener is attached, so overhead is zero otherwise.
+Adapter chains and multi-relays emit `System.Diagnostics.Activity` traces from an `ActivitySource` named `Relay`, and metrics from a `Meter` with the same name. Neither does any work while nothing is listening.
 ```csharp
 // OpenTelemetry
 builder.Services.AddOpenTelemetry()
-    .WithTracing(t => t.AddSource(RelayDiagnostics.SourceName));
+    .WithTracing(t => t.AddSource(RelayDiagnostics.SourceName))
+    .WithMetrics(m => m.AddMeter(RelayDiagnostics.MeterName));
 ```
+
+| Instrument | Kind | Tags |
+| --- | --- | --- |
+| `relay.adapter_chain.executions` | Counter | `relay.chain.kind`, `relay.chain.result_type`, `relay.chain.steps`, `relay.outcome` |
+| `relay.adapter_chain.duration` | Histogram (ms) | same as above |
+| `relay.multi_relay.operations` | Counter | `relay.strategy`, `relay.operation`, `relay.count`, `relay.outcome` |
+| `relay.multi_relay.duration` | Histogram (ms) | same as above |
+| `relay.circuit_breaker.transitions` | Counter | `relay.type`, `relay.circuit.state` |
+| `relay.circuit_breaker.open_circuits` | UpDownCounter | `relay.type` |
+| `relay.circuit_breaker.skipped` | Counter | `relay.type` |
+
+That is enough to alert on "any circuit open", chart failover rate by strategy, and watch chain latency without writing a line of instrumentation yourself.
 
 ### **13. Container Validation**
 Static analysis of your `IServiceCollection` that runs *before* the provider is built. It reports
@@ -345,7 +358,33 @@ services.DecorateKeyed<IPaymentService, AuditDecorator>("stripe"); // keyed regi
 ```
 Decorators stack in the order they are applied and preserve the original lifetime.
 
-### **17. Trimming & Native AOT**
+### **17. Circuit Breaker**
+Retry and failover still pay for a dead relay on every single request. A breaker remembers the
+outcome: after N consecutive failures the relay is skipped outright, and after the break it gets
+one trial call before it is trusted again.
+```csharp
+services.AddMultiRelay<IPaymentProvider>(config => config
+        .AddRelay<PrimaryProvider>()
+        .AddRelay<BackupProvider>()
+        .WithStrategy(RelayStrategy.Failover)
+        .WithRetry(maxAttempts: 3, delay: TimeSpan.FromMilliseconds(100))
+        .WithCircuitBreaker(failureThreshold: 2, breakDuration: TimeSpan.FromSeconds(30)))
+    .Build();
+```
+Retry and breaker compose: the retries run first, and only an exhausted relay counts as one
+failure. State transitions are driven entirely by `TimeProvider`, so a `FakeTimeProvider` makes
+them deterministic in tests, and `MultiRelay<T>.GetCircuitSnapshots()` exposes the live state for a
+health endpoint:
+```csharp
+foreach (var circuit in multiRelay.GetCircuitSnapshots())
+    Console.WriteLine($"{circuit.RelayType.Name}: {circuit.State}");
+// PrimaryProvider: Open
+// BackupProvider: Closed
+```
+Applies to the `Failover` and `FirstSuccessful` strategies — the ones where a per-relay failure is
+actually observed. Disabled unless you call `WithCircuitBreaker`.
+
+### **18. Trimming & Native AOT**
 The package is marked `IsAotCompatible` and ships with trim annotations. Adapter chains build
 strongly-typed invokers at registration time, so executing a chain performs **no reflection at all**.
 The assembly-scanning entry points (`RegisterRelays`, `ForInterface<T>`, `AddAdaptersFromAssembly<T>`,
@@ -424,7 +463,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="2.0.0" />
+<PackageReference Include="Relay" Version="2.1.0" />
 ```
 
 ### **Basic Setup**
@@ -454,6 +493,7 @@ ones worth starting with:
 - **ContextRouting** — multi-tenant routing that picks an implementation per request from `IRelayContext`
 - **AsyncChain** — non-blocking I/O transformation pipeline
 - **LifetimeSafety** — captive dependency detection, `Lazy<T>` resolution and scope-per-run
+- **CircuitBreaker** — a failing provider tripping its circuit, with live metrics printed from a `MeterListener`
 
 The [`tests/`](tests) project doubles as executable documentation of the full API.
 

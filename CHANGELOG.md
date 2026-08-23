@@ -4,6 +4,21 @@ All notable changes to Relay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0]
+
+### Added
+
+- **Circuit breaker for multi-relays**: `WithCircuitBreaker(failureThreshold, breakDuration)` stops
+  calling a relay that failed repeatedly, skipping it until the break elapses and then allowing a
+  single trial call. Applies to the `Failover` and `FirstSuccessful` strategies, composes with
+  `WithRetry`, and is driven by `TimeProvider` so it is deterministic in tests.
+  `MultiRelay<T>.GetCircuitSnapshots()` exposes live circuit state for health endpoints.
+- **Metrics**: adapter chains, multi-relay operations and circuit breaker transitions are now
+  published on a `Meter` named `Relay` (`RelayDiagnostics.MeterName`), alongside the existing
+  traces. Seven instruments cover execution counts, durations, circuit transitions, the number of
+  currently open circuits and relays skipped by an open circuit. Wire them up with
+  `AddMeter(RelayDiagnostics.MeterName)`.
+
 ## [2.0.0]
 
 ### Added

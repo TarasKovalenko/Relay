@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,29 +98,45 @@ public sealed class AdapterChain<TResult>(
         chainActivity?.SetTag("relay.chain.source_type", firstStep.SourceType.Name);
         chainActivity?.SetTag("relay.chain.steps", _steps.Count);
 
-        // Execute each step in the chain
-        foreach (var step in _steps)
+        var startTimestamp = Stopwatch.GetTimestamp();
+        var succeeded = false;
+        try
         {
-            using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity(
-                "AdapterChain.Step"
-            );
-            stepActivity?.SetTag("relay.adapter", step.AdapterType.Name);
-            stepActivity?.SetTag("relay.adapter.target", step.TargetType.Name);
+            // Execute each step in the chain
+            foreach (var step in _steps)
+            {
+                using var stepActivity = RelayDiagnostics.ActivitySource.StartActivity(
+                    "AdapterChain.Step"
+                );
+                stepActivity?.SetTag("relay.adapter", step.AdapterType.Name);
+                stepActivity?.SetTag("relay.adapter.target", step.TargetType.Name);
 
-            current =
-                step.Invoker is not null
-                    ? step.Invoker(_serviceProvider, current)
-                    : InvokeByReflection(step, current);
+                current =
+                    step.Invoker is not null
+                        ? step.Invoker(_serviceProvider, current)
+                        : InvokeByReflection(step, current);
+            }
+
+            if (current is not TResult result)
+            {
+                throw new InvalidOperationException(
+                    $"Final result type {current?.GetType().Name} cannot be cast to expected type {typeof(TResult).Name}"
+                );
+            }
+
+            succeeded = true;
+            return result;
         }
-
-        if (current is not TResult result)
+        finally
         {
-            throw new InvalidOperationException(
-                $"Final result type {current?.GetType().Name} cannot be cast to expected type {typeof(TResult).Name}"
+            RelayMetrics.RecordChain(
+                "sync",
+                typeof(TResult),
+                _steps.Count,
+                startTimestamp,
+                succeeded
             );
         }
-
-        return result;
     }
 
     [UnconditionalSuppressMessage(
