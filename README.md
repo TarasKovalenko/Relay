@@ -463,7 +463,7 @@ Install-Package Relay
 dotnet add package Relay
 
 # PackageReference
-<PackageReference Include="Relay" Version="2.1.0" />
+<PackageReference Include="Relay" Version="2.2.0" />
 ```
 
 ### **Basic Setup**
