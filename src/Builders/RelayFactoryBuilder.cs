@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Relay.Core.Implementations;
 using Relay.Core.Interfaces;
 
@@ -14,7 +15,7 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
 
     // Type-based registrations are materialized in Build() so the configured lifetime applies
     // regardless of the order WithLifetime/RegisterRelay are called in.
-    private readonly List<(Type ImplType, bool Keyed, string Key)> _typeRegistrations = [];
+    private readonly List<TypeRegistration> _typeRegistrations = [];
 
     private string? _defaultKey;
 
@@ -47,7 +48,9 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
     /// Register a relay implementation resolved from the container. The implementation and its
     /// dependencies are created by DI using the configured lifetime.
     /// </summary>
-    public RelayFactoryBuilder<TInterface> RegisterRelay<TImplementation>(string key)
+    public RelayFactoryBuilder<TInterface> RegisterRelay<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >(string key)
         where TImplementation : class, TInterface
     {
         if (string.IsNullOrEmpty(key))
@@ -56,7 +59,7 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
         }
 
         _factories[key] = static provider => provider.GetRequiredService<TImplementation>();
-        _typeRegistrations.Add((typeof(TImplementation), false, key));
+        _typeRegistrations.Add(new TypeRegistration(typeof(TImplementation), false, key));
         return this;
     }
 
@@ -66,7 +69,9 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
     /// be resolved either through the factory or directly via
     /// <c>[FromKeyedServices(key)]</c> / <c>GetRequiredKeyedService&lt;TInterface&gt;(key)</c>.
     /// </summary>
-    public RelayFactoryBuilder<TInterface> RegisterKeyedRelay<TImplementation>(string key)
+    public RelayFactoryBuilder<TInterface> RegisterKeyedRelay<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation
+    >(string key)
         where TImplementation : class, TInterface
     {
         if (string.IsNullOrEmpty(key))
@@ -75,7 +80,7 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
         }
 
         _factories[key] = provider => provider.GetRequiredKeyedService<TInterface>(key);
-        _typeRegistrations.Add((typeof(TImplementation), true, key));
+        _typeRegistrations.Add(new TypeRegistration(typeof(TImplementation), true, key));
         return this;
     }
 
@@ -110,12 +115,21 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
     public IServiceCollection Build()
     {
         // Materialize type-based registrations with the final configured lifetime.
-        foreach (var (implType, keyed, key) in _typeRegistrations)
+        foreach (var registration in _typeRegistrations)
         {
             _services.Add(
-                keyed
-                    ? new ServiceDescriptor(typeof(TInterface), key, implType, _lifetime)
-                    : new ServiceDescriptor(implType, implType, _lifetime)
+                registration.Keyed
+                    ? new ServiceDescriptor(
+                        typeof(TInterface),
+                        registration.Key,
+                        registration.ImplementationType,
+                        _lifetime
+                    )
+                    : new ServiceDescriptor(
+                        registration.ImplementationType,
+                        registration.ImplementationType,
+                        _lifetime
+                    )
             );
         }
 
@@ -134,5 +148,21 @@ public sealed class RelayFactoryBuilder<TInterface>(IServiceCollection services)
         );
 
         return _services;
+    }
+
+    // A tuple element cannot carry the trimming annotation ServiceDescriptor requires, so the
+    // implementation type is kept in a small struct that can.
+    private readonly struct TypeRegistration(
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type implementationType,
+        bool keyed,
+        string key
+    )
+    {
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        public Type ImplementationType { get; } = implementationType;
+
+        public bool Keyed { get; } = keyed;
+
+        public string Key { get; } = key;
     }
 }

@@ -27,7 +27,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          global-json-file: global.json
+          # Relay and its tests target net10.0 and net11.0, so both runtimes must be present.
+          dotnet-version: |
+            10.0.x
+            11.0.x
 
       - name: Resolve version
         id: version
