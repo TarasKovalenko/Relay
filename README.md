@@ -44,7 +44,7 @@ Transform the adapter pattern from a simple design pattern into a **powerful arc
 dotnet add package Relay
 ```
 
-> **Requirements:** .NET 10.0 or later.
+> **Requirements:** .NET 10 or .NET 11. The package ships `net10.0` and `net11.0` builds.
 
 ### Basic Usage
 ```csharp

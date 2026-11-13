@@ -4,6 +4,12 @@ All notable changes to Relay are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `net11.0` target alongside `net10.0`. The package and tests now build and run on both.
+
 ## [2.1.0]
 
 ### Added
