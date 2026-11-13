@@ -12,8 +12,8 @@ All notable changes to Relay are documented here. The format follows
 
 ### Changed
 
-- Microsoft.Extensions.DependencyInjection, Logging and Options dependencies raised to 11.0.0
-  (from 10.0.11), so consumers on `net10.0` now pull in the 11.0.0 packages.
+- Microsoft.Extensions.DependencyInjection.Abstractions dependency raised to 11.0.0 (from 10.0.11),
+  including for `net10.0` consumers.
 - `RegisterRelay<T>` and `RegisterKeyedRelay<T>` annotate `T` with
   `[DynamicallyAccessedMembers(PublicConstructors)]`, so implementation constructors survive
   trimming.
